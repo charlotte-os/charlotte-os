@@ -4,7 +4,7 @@
 
 ## Programming Languages
 
-- CharlotteOS is written primarily in the latest Edition of Rust, with architecture-specific assembly where required or advantageousf.
+- CharlotteOS is written primarily in the latest Edition of Rust, with architecture-specific assembly where required or advantageous.
 - x86-64 assembly uses Intel syntax as implemented by `rustc`/`llvm-mc`.
 
 ---
