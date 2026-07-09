@@ -42,7 +42,7 @@ pub trait LocalIntCtlrIfce {
         target_vector: InterruptVectorNum,
     ) -> Result<(), Self::Error>;
     /// Signal End of Interrupt
-    fn signal_eoi();
+    extern "C" fn signal_eoi();
 }
 
 pub trait ExternalInterruptControllerIfce {

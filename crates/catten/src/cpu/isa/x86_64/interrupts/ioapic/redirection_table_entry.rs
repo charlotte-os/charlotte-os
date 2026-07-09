@@ -55,7 +55,7 @@ impl TryFrom<u8> for IoApicDeliveryMode {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 #[repr(transparent)]
 pub struct IoApicRedirEntry(pub u64);
 
@@ -70,8 +70,9 @@ impl IoApicRedirEntry {
         mask_shift_read(self.0, VECTOR_MASK, VECTOR_SHIFT) as u8
     }
 
-    pub fn set_vector(&mut self, vector: u8) {
+    pub fn set_vector(mut self, vector: u8) -> Self {
         self.0 = (self.0 & !VECTOR_MASK) | ((vector as u64) << VECTOR_SHIFT);
+        self
     }
 
     pub fn get_delivery_mode(&self) -> Result<IoApicDeliveryMode, Error> {
@@ -80,16 +81,18 @@ impl IoApicRedirEntry {
         IoApicDeliveryMode::try_from(raw_delivery_mode)
     }
 
-    pub fn set_delivery_mode(&mut self, delivery_mode: IoApicDeliveryMode) {
+    pub fn set_delivery_mode(mut self, delivery_mode: IoApicDeliveryMode) -> Self {
         self.0 = (self.0 & !DELIVERY_MODE_MASK) | ((delivery_mode as u64) << DELIVERY_MODE_SHIFT);
+        self
     }
 
     pub fn is_dest_mode_logical(&self) -> bool {
         mask_shift_read(self.0, DEST_MODE_MASK, DEST_MODE_SHIFT) != 0
     }
 
-    pub fn set_dest_mode(&mut self, is_logical: bool) {
+    pub fn set_dest_mode(mut self, is_logical: bool) -> Self {
         self.0 = (self.0 & !DEST_MODE_MASK) | ((is_logical as u64) << DEST_MODE_SHIFT);
+        self
     }
 
     pub fn is_delivery_pending(&self) -> bool {
@@ -100,37 +103,40 @@ impl IoApicRedirEntry {
         mask_shift_read(self.0, PIN_POLARITY_MASK, PIN_POLARITY_SHIFT) != 0
     }
 
-    pub fn set_pin_polarity(&mut self, is_active_low: bool) {
+    pub fn set_pin_polarity(mut self, is_active_low: bool) -> Self {
         self.0 = (self.0 & !PIN_POLARITY_MASK) | ((is_active_low as u64) << PIN_POLARITY_SHIFT);
+        self
     }
 
     pub fn is_level_triggered(&self) -> bool {
         mask_shift_read(self.0, TRIGGER_MODE_MASK, TRIGGER_MODE_SHIFT) != 0
     }
 
-    pub fn set_trigger_mode(&mut self, is_level_triggered: bool) {
+    pub fn set_trigger_mode(mut self, is_level_triggered: bool) -> Self {
         self.0 =
             (self.0 & !TRIGGER_MODE_MASK) | ((is_level_triggered as u64) << TRIGGER_MODE_SHIFT);
+        self
     }
 
     pub fn is_masked(&self) -> bool {
         mask_shift_read(self.0, MASK_MASK, MASK_SHIFT) != 0
     }
 
-    pub fn set_mask_state(&mut self, mask_state: bool) {
+    pub fn set_mask_state(mut self, mask_state: bool) -> Self {
         self.0 = (self.0 & !MASK_MASK) | ((mask_state as u64) << MASK_SHIFT);
+        self
     }
 
     pub fn get_destination(&self) -> LpId {
         mask_shift_read(self.0, DESTINATION_MASK, DESTINATION_SHIFT) as LpId
     }
 
-    pub fn set_destination(&mut self, destination: LpId) -> Result<(), Error> {
+    pub fn set_destination(mut self, destination: LpId) -> Result<Self, Error> {
         if destination > DESTINATION_MAX {
             Err(Error::LpIdOutOfRange(destination))
         } else {
             self.0 = (self.0 & !DESTINATION_MASK) | ((destination as u64) << DESTINATION_SHIFT);
-            Ok(())
+            Ok(self)
         }
     }
 }

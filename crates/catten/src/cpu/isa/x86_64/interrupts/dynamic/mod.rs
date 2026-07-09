@@ -5,7 +5,10 @@ use spin::LazyLock;
 use crate::cpu::{
     interrupt_routing::InterruptHandler,
     isa::{
-        constants::interrupt_vectors::FIXED_INTERRUPT_VECTOR_COUNT,
+        constants::interrupt_vectors::{
+            DYN_VEC_START_OFFSET,
+            DYN_VECS_PER_LP,
+        },
         init::gdt,
         interface::interrupts::DynInterruptDispatcherIfce,
         interrupts::idt::Idt,
@@ -17,8 +20,6 @@ use crate::cpu::{
     multiprocessor::spin::per_lp::PerLp,
 };
 
-pub const DYN_VECS_PER_LP: u64 = 220;
-pub const DYN_VEC_START_OFFSET: u64 = 35;
 #[unsafe(no_mangle)]
 pub static DYN_IH_MATRIX: LazyLock<DynInterruptDispatcher> =
     LazyLock::new(DynInterruptDispatcher::default);
@@ -45,13 +46,15 @@ impl DynInterruptDispatcherIfce for DynInterruptDispatcher {
         handler: InterruptHandler,
     ) {
         let mut table = unsafe { self.matrix.get_nonlocal_mut(lp) };
-        table[vector as usize] = Some(handler);
+        let index = vector - DYN_VEC_START_OFFSET;
+        table[index as usize] = Some(handler);
     }
 
     #[unsafe(no_mangle)]
     extern "C" fn get_dyn_ih(&self, vector: InterruptVectorNum) -> *const InterruptHandler {
         if let Ok(table) = self.matrix.try_get() {
-            if let Some(ih) = table[vector as usize] {
+            let index = vector - DYN_VEC_START_OFFSET;
+            if let Some(ih) = table[index as usize] {
                 return ih as *const InterruptHandler;
             }
         }
@@ -60,7 +63,8 @@ impl DynInterruptDispatcherIfce for DynInterruptDispatcher {
 
     fn is_vector_available(&self, lp: LpId, vector: InterruptVectorNum) -> bool {
         let table = unsafe { self.matrix.get_nonlocal(lp) };
-        table[vector as usize].is_none()
+        let index = vector - DYN_VEC_START_OFFSET;
+        table[index as usize].is_none()
     }
 }
 
@@ -295,7 +299,7 @@ macro_rules! register_dyn_isr {
         $idt.set_gate(
             // Dynamic entries start after all fixed ones except the spurious interrupt vector
             // which is always 255 since it is the lowest priority
-            (FIXED_INTERRUPT_VECTOR_COUNT - 1) + $offset,
+            (DYN_VEC_START_OFFSET) + $offset,
             $isr,
             gdt::KERNEL_CODE_SELECTOR,
             None,

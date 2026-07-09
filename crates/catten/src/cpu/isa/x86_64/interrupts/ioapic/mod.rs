@@ -3,13 +3,21 @@ mod redirection_table_entry;
 use redirection_table_entry::*;
 
 use crate::{
-    cpu::isa::{
-        io::{
-            IReg32Ifce,
-            IoReg32,
-            OReg32Ifce,
+    cpu::{
+        isa::{
+            constants::interrupt_vectors::SPURIOUS_INTERRUPT_VECTOR_NUM,
+            interface::interrupts::ExternalInterruptControllerIfce,
+            io::{
+                IReg32Ifce,
+                IoReg32,
+                OReg32Ifce,
+            },
+            lp::{
+                InterruptVectorNum,
+                LpId,
+            },
         },
-        lp::LpId,
+        multiprocessor::get_lp_count,
     },
     klib::bitwise::{
         mask_from_len,
@@ -28,11 +36,13 @@ const IOAPIC_VER_MASK: u32 = 0xffu32 << IOAPIC_VER_SHIFT;
 const IOAPIC_MAX_REDIR_SHIFT: u8 = 16;
 const IOAPIC_MAX_REDIR_MASK: u32 = 0xffu32 << IOAPIC_MAX_REDIR_SHIFT;
 
+#[derive(Debug)]
 /// IOAPIC Error type
 pub enum Error {
     InvalidDeliveryMode(u8),
     LpIdOutOfRange(LpId),
     RedirIndexOutOfRange(RedirIdx),
+    CannotTargetFixedVector(InterruptVectorNum),
 }
 
 #[repr(transparent)]
@@ -120,5 +130,67 @@ impl IoApic {
             self.write64(Self::REDIR_TABLE_BASE_IDX + index * REDIR_SIZE_IN_IOAPIC_REGS, entry.0);
             Ok(())
         }
+    }
+}
+
+impl ExternalInterruptControllerIfce for IoApic {
+    type EicPinNum = RedirIdx;
+    type Error = Error;
+
+    fn init(&mut self) {
+        let default_entry = IoApicRedirEntry::default()
+            .set_destination(0)
+            .expect("Tried to set invalid target LP while initializing an IoApicRedirEntry.")
+            .set_vector(SPURIOUS_INTERRUPT_VECTOR_NUM)
+            .set_dest_mode(false)
+            .set_delivery_mode(IoApicDeliveryMode::Fixed)
+            .set_pin_polarity(false)
+            .set_trigger_mode(false)
+            .set_mask_state(true);
+        for i in 0..=self.get_max_redirection_entry() {
+            self.set_redirection_entry(i, default_entry).unwrap();
+        }
+    }
+
+    fn setup_ext_int(
+        &mut self,
+        lp: LpId,
+        vector: InterruptVectorNum,
+        pin_num: Self::EicPinNum,
+        active_low: bool,
+        level_triggered: bool,
+        mask_state: bool,
+    ) -> Result<(), Self::Error> {
+        /* Validate args */
+        if lp >= get_lp_count() {
+            return Err(Error::LpIdOutOfRange(lp));
+        }
+        if vector < 2 || (vector > 2 && vector < 32) {
+            return Err(Error::CannotTargetFixedVector(vector));
+        }
+        if pin_num > self.get_max_redirection_entry() {
+            return Err(Error::RedirIndexOutOfRange(pin_num));
+        }
+
+        let entry = IoApicRedirEntry::default()
+            .set_destination(lp)?
+            .set_vector(vector)
+            .set_pin_polarity(active_low)
+            .set_trigger_mode(level_triggered)
+            .set_mask_state(mask_state);
+        self.set_redirection_entry(pin_num, entry)
+    }
+
+    fn set_ext_int_mask_state(
+        &mut self,
+        pin_num: Self::EicPinNum,
+        mask_state: bool,
+    ) -> Result<(), Self::Error> {
+        if pin_num > self.get_max_redirection_entry() {
+            return Err(Error::RedirIndexOutOfRange(pin_num));
+        }
+        let mut entry = self.get_redirection_entry(pin_num);
+        entry = entry.set_mask_state(mask_state);
+        self.set_redirection_entry(pin_num, entry)
     }
 }

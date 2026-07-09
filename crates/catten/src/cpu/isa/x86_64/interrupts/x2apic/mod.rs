@@ -16,6 +16,7 @@ use crate::{
                 interrupts::LocalIntCtlrIfce,
                 timers::LpTimerIfce,
             },
+            interrupts::Error,
             lp::{
                 InterruptVectorNum,
                 LpId,
@@ -31,19 +32,14 @@ use crate::{
 pub static LAPICS: LazyLock<PerLp<MaybeUninit<X2Apic>>> =
     LazyLock::new(|| PerLp::new(|| MaybeUninit::uninit()));
 
-#[derive(Debug)]
-pub enum Error {
-    InvalidLpId,
-}
-
 /// # Interrupt Command Register Delivery Mode
 #[repr(u32)]
 enum IcrDeliveryMode {
     Fixed = 0b000,
-    Smi = 0b010,
-    Nmi = 0b100,
-    Init = 0b101,
-    Startup = 0b110,
+    _Smi = 0b010,
+    _Nmi = 0b100,
+    _Init = 0b101,
+    _Startup = 0b110,
 }
 
 /// # Interrupt Command Register Destination Shorthand
@@ -174,7 +170,8 @@ impl LocalIntCtlrIfce for X2Apic {
         }
     }
 
-    fn signal_eoi() {
+    #[unsafe(no_mangle)]
+    extern "C" fn signal_eoi() {
         unsafe {
             msrs::write(msrs::x2apic::EOI_REGISTER, 0);
         }
