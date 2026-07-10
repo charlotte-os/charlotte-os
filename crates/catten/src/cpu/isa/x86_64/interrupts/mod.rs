@@ -22,4 +22,5 @@ pub static IDT_TABLE: LazyLock<IdTable<Mutex<Idt>>> = LazyLock::new(IdTable::new
 #[derive(Debug)]
 pub enum Error {
     InvalidLpId,
+    InvalidDynamicVectorNumber(u8),
 }
