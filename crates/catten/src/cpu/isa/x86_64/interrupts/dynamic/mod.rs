@@ -57,14 +57,12 @@ impl Into<usize> for DynamicInterruptVectorNum {
 #[derive(Debug)]
 pub struct DynInterruptDispatcher {
     matrix: PerLp<[Option<InterruptHandler>; DYN_VECS_PER_LP as usize]>,
-    dynamic_vectors_used: PerLp<u64>,
 }
 
 impl Default for DynInterruptDispatcher {
     fn default() -> Self {
         DynInterruptDispatcher {
             matrix: PerLp::new(|| [None; DYN_VECS_PER_LP as usize]),
-            dynamic_vectors_used: PerLp::new(|| 0),
         }
     }
 }
@@ -111,7 +109,7 @@ impl DynInterruptDispatcherIfce for DynInterruptDispatcher {
     }
 
     fn dynamic_vectors_used(&self, lp: LpId) -> u64 {
-        let used = unsafe { self.dynamic_vectors_used.get_nonlocal(lp) };
-        *used
+        let table = unsafe { self.matrix.get_nonlocal(lp) };
+        table.iter().filter(|entry| entry.is_some()).count() as u64
     }
 }
