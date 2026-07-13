@@ -18,7 +18,7 @@ use crate::{
             },
             interrupts::Error,
             lp::{
-                InterruptVectorNum,
+                InterruptSourceDiscriminator,
                 LpId,
             },
             timers::apic_timer::ApicTimer,
@@ -140,7 +140,7 @@ impl LocalIntCtlrIfce for X2Apic {
     /// Send a unicast IPI to the target logical processor
     ///
     /// Ref: Intel SDM Vol.3 12.12.10.1
-    fn send_unicast_ipi(target_lp: LpId, target_vector: InterruptVectorNum) -> Result<(), Error> {
+    fn send_unicast_ipi(target_lp: LpId, target_vector: InterruptSourceDiscriminator) -> Result<(), Error> {
         if let Some(apic_id) = Self::translate_lp_id(target_lp) {
             // Get the physical APIC ID for the target LP
             let dest = apic_id.physical;

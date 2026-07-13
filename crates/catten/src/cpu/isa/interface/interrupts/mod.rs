@@ -3,7 +3,7 @@ use crate::cpu::{
     isa::{
         interrupts::Error,
         lp::{
-            InterruptVectorNum,
+            InterruptSourceDiscriminator,
             LpId,
         },
     },
@@ -16,17 +16,17 @@ pub trait DynInterruptDispatcherIfce {
     extern "C" fn set_dyn_ih(
         &self,
         lp: LpId,
-        vector: InterruptVectorNum,
+        vector: InterruptSourceDiscriminator,
         handler: InterruptHandler,
     ) -> core::ffi::c_int;
     /// Get the interrupt handler for a given vector
     /// Note: must be #[unsafe(no_mangle)] and extern "C" to be callable from assembly code
-    extern "C" fn get_dyn_ih(&self, vector: InterruptVectorNum) -> *const InterruptHandler;
+    extern "C" fn get_dyn_ih(
+        &self,
+        vector: InterruptSourceDiscriminator,
+    ) -> *const InterruptHandler;
     /// Check if a given vector is available for a logical processor
-    fn is_vector_available(&self, lp: LpId, vector: InterruptVectorNum) -> bool;
-    /// Number of dynamic vectors in use by the specified logical processor. Should be
-    /// used by the interrupt routing manager for load balancing.
-    fn dynamic_vectors_used(&self, lp: LpId) -> u64;
+    fn is_vector_available(&self, lp: LpId, vector: InterruptSourceDiscriminator) -> bool;
 }
 
 /// Local Interrupt Controller Interface
@@ -38,7 +38,7 @@ pub trait LocalIntCtlrIfce {
     /// Send an inter-processor interrupt to the specified logical processor
     fn send_unicast_ipi(
         target_lp: LpId,
-        target_vector: InterruptVectorNum,
+        target_vector: InterruptSourceDiscriminator,
     ) -> Result<(), Self::Error>;
     /// Signal End of Interrupt
     extern "C" fn signal_eoi();
@@ -54,7 +54,7 @@ pub trait ExternalInterruptControllerIfce {
     fn setup_ext_int(
         &mut self,
         lp: LpId,
-        vector: InterruptVectorNum,
+        vector: InterruptSourceDiscriminator,
         pin_num: Self::EicPinNum,
         active_low: bool,
         level_triggered: bool,

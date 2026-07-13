@@ -7,4 +7,4 @@ pub type CoreId = u32;
 
 pub type EicId = u8;
 pub type EicPinNum = u8;
-pub type InterruptVectorNum = u8;
+pub type InterruptSourceDiscriminator = u8;

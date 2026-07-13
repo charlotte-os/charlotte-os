@@ -15,13 +15,7 @@
  * See the x86_64 implementation for examples.
  */
 
-use crate::cpu::isa::interrupts::LocalIntCtlr;
-use crate::cpu::isa::timers::LpTimer;
-
-pub trait LpIsaDataIfce {
-    fn new() -> Self;
-    fn get() -> &'static Self;
-    fn get_mut() -> &'static mut Self;
-    fn get_lic(&mut self) -> &mut LocalIntCtlr;
-    fn get_lp_timer(&mut self) -> &mut LpTimer;
-}
+use crate::cpu::isa::{
+    interrupts::LocalIntCtlr,
+    timers::LpTimer,
+};

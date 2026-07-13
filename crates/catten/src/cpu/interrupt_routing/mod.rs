@@ -14,15 +14,22 @@ use alloc::collections::btree_map::BTreeMap;
 use hashbrown::HashMap;
 
 use crate::{
-    cpu::isa::lp::{
-        EicId,
-        EicPinNum,
-        InterruptVectorNum,
-        LpId,
+    cpu::isa::{
+        constants::interrupt_vectors::{
+            DYN_VEC_START_OFFSET,
+            DYN_VECS_PER_LP,
+        },
+        interface::lp,
+        lp::{
+            EicId,
+            EicPinNum,
+            InterruptSourceDiscriminator,
+            LpId,
+        },
     },
-    device_management::drivers::busses::{
-        pci_express,
-        pci_express::topology::PcieLocation,
+    device_management::drivers::busses::pci_express::{
+        self,
+        topology::PcieLocation,
     },
 };
 
@@ -40,16 +47,19 @@ pub struct EicSource {
     pub pic_id: EicId,
     pub pin_num: EicPinNum,
 }
+/// PCIe MSI source for an interrupt signal
 #[derive(Default, Clone, Debug)]
 pub struct PcieMsiSource {
     pub location: PcieLocation,
     pub msi_num: u32,
 }
+/// PCIe MSI-X source for an interrupt signal
 #[derive(Default, Clone, Debug)]
 pub struct PcieMsiXSource {
     pub location: PcieLocation,
     pub table_index: u32,
 }
+/// An enum representing the supported interrupt signal routing mechanisms
 #[derive(Clone, Debug)]
 pub enum InterruptRouter {
     ExternalInterruptController(EicSource),
@@ -69,24 +79,44 @@ pub struct InterruptInput {
 
 #[derive(Default, Clone, Debug)]
 pub struct InterruptRoutingManager {
-    routes: HashMap<LpId, BTreeMap<InterruptVectorNum, InterruptInput>>,
+    routes: HashMap<LpId, BTreeMap<InterruptSourceDiscriminator, InterruptInput>>,
 }
 
 pub struct InterruptTarget {
     lp_id: LpId,
-    vector_num: InterruptVectorNum,
+    discriminator: InterruptSourceDiscriminator,
 }
 
 impl InterruptRoutingManager {
-    pub fn try_register_interrupt(
+    pub fn register_external_interrupt(
         &mut self,
         input: InterruptInput,
         handler: InterruptHandler,
     ) -> Result<InterruptTarget, Error> {
-        todo!(
-            "Set the appropriate routing entries in the external interrupt controller, \
-             redirection entries in the IOMMU, and local interrupt controller and register the \
-             interrupt handler."
-        )
+        let target_lp = self.least_loaded_lp();
+        let vector = self.find_free_vector(target_lp).ok_or(Error::InterruptVectorsExhausted)?;
+
+        todo!("Register the handler with the appropriate LP and route the interrupt source to it.")
+    }
+
+    fn least_loaded_lp(&self) -> LpId {
+        let mut lp: LpId = 0;
+
+        for (lp_id, routes) in &self.routes {
+            if routes.len() < self.routes[&lp].len() {
+                lp = *lp_id;
+            }
+        }
+        lp
+    }
+
+    fn find_free_vector(&self, lp: LpId) -> Option<InterruptSourceDiscriminator> {
+        for v in DYN_VEC_START_OFFSET..DYN_VECS_PER_LP {
+            let vector = InterruptSourceDiscriminator::from(v);
+            if !self.routes[&lp].contains_key(&vector) {
+                return Some(vector);
+            }
+        }
+        None
     }
 }

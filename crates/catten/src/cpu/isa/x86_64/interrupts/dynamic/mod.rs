@@ -13,7 +13,7 @@ use crate::cpu::{
         interface::interrupts::DynInterruptDispatcherIfce,
         interrupts::Error,
         lp::{
-            InterruptVectorNum,
+            InterruptSourceDiscriminator,
             LpId,
         },
     },
@@ -28,10 +28,10 @@ pub static DYN_IH_MATRIX: LazyLock<DynInterruptDispatcher> =
 /// A wrapper type for dynamic interrupt vector numbers
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct DynamicInterruptVectorNum(u8);
-impl TryFrom<InterruptVectorNum> for DynamicInterruptVectorNum {
+impl TryFrom<InterruptSourceDiscriminator> for DynamicInterruptVectorNum {
     type Error = Error;
 
-    fn try_from(value: InterruptVectorNum) -> Result<Self, Self::Error> {
+    fn try_from(value: InterruptSourceDiscriminator) -> Result<Self, Self::Error> {
         if FIXED_INTERRUPT_VECTORS.contains(&value) {
             Err(Error::InvalidDynamicVectorNumber(value))
         } else {
@@ -40,15 +40,15 @@ impl TryFrom<InterruptVectorNum> for DynamicInterruptVectorNum {
     }
 }
 
-impl Into<InterruptVectorNum> for DynamicInterruptVectorNum {
-    fn into(self) -> InterruptVectorNum {
-        InterruptVectorNum::from(self.0 - DYN_VEC_START_OFFSET)
+impl Into<InterruptSourceDiscriminator> for DynamicInterruptVectorNum {
+    fn into(self) -> InterruptSourceDiscriminator {
+        InterruptSourceDiscriminator::from(self.0 - DYN_VEC_START_OFFSET)
     }
 }
 
 impl Into<usize> for DynamicInterruptVectorNum {
     fn into(self) -> usize {
-        <DynamicInterruptVectorNum as Into<InterruptVectorNum>>::into(self) as usize
+        <DynamicInterruptVectorNum as Into<InterruptSourceDiscriminator>>::into(self) as usize
     }
 }
 
@@ -72,7 +72,7 @@ impl DynInterruptDispatcherIfce for DynInterruptDispatcher {
     extern "C" fn set_dyn_ih(
         &self,
         lp: LpId,
-        vector: InterruptVectorNum,
+        vector: InterruptSourceDiscriminator,
         handler: InterruptHandler,
     ) -> core::ffi::c_int {
         if let Ok(dyn_vec_num) = DynamicInterruptVectorNum::try_from(vector) {
@@ -86,7 +86,10 @@ impl DynInterruptDispatcherIfce for DynInterruptDispatcher {
     }
 
     #[unsafe(no_mangle)]
-    extern "C" fn get_dyn_ih(&self, vector: InterruptVectorNum) -> *const InterruptHandler {
+    extern "C" fn get_dyn_ih(
+        &self,
+        vector: InterruptSourceDiscriminator,
+    ) -> *const InterruptHandler {
         if let Ok(table) = self.matrix.try_get() {
             if let Ok(dyn_vec_num) = DynamicInterruptVectorNum::try_from(vector) {
                 let index: usize = <DynamicInterruptVectorNum as Into<usize>>::into(dyn_vec_num);
@@ -98,7 +101,7 @@ impl DynInterruptDispatcherIfce for DynInterruptDispatcher {
         core::ptr::null()
     }
 
-    fn is_vector_available(&self, lp: LpId, vector: InterruptVectorNum) -> bool {
+    fn is_vector_available(&self, lp: LpId, vector: InterruptSourceDiscriminator) -> bool {
         let table = unsafe { self.matrix.get_nonlocal(lp) };
         if let Ok(index) = DynamicInterruptVectorNum::try_from(vector) {
             let index: usize = index.into();
@@ -106,10 +109,5 @@ impl DynInterruptDispatcherIfce for DynInterruptDispatcher {
         } else {
             false
         }
-    }
-
-    fn dynamic_vectors_used(&self, lp: LpId) -> u64 {
-        let table = unsafe { self.matrix.get_nonlocal(lp) };
-        table.iter().filter(|entry| entry.is_some()).count() as u64
     }
 }
