@@ -19,7 +19,6 @@ use crate::{
             DYN_VEC_START_OFFSET,
             DYN_VECS_PER_LP,
         },
-        interface::lp,
         lp::{
             EicId,
             EicPinNum,
