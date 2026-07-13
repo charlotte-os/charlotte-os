@@ -1,8 +1,19 @@
-use core::iter::Step;
-use core::ops::{Add, AddAssign, Sub};
+use core::{
+    iter::Step,
+    ops::{
+        Add,
+        AddAssign,
+        Sub,
+    },
+};
 
-use crate::cpu::isa::interface::memory::address::{Address, VirtualAddress};
-use crate::cpu::isa::memory::address::VADDR_SIG_BITS;
+use crate::cpu::isa::{
+    interface::memory::address::{
+        Address,
+        VirtualAddress,
+    },
+    memory::address::VADDR_SIG_BITS,
+};
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -236,6 +247,26 @@ impl Step for VAddr {
         } else {
             None
         }
+    }
+
+    fn forward_overflowing(start: Self, count: usize) -> (Self, bool) {
+        let (new_raw, overflow) = start.raw.overflowing_add(count);
+        (
+            VAddr {
+                raw: new_raw,
+            },
+            overflow,
+        )
+    }
+
+    fn backward_overflowing(start: Self, count: usize) -> (Self, bool) {
+        let (new_raw, overflow) = start.raw.overflowing_sub(count);
+        (
+            VAddr {
+                raw: new_raw,
+            },
+            overflow,
+        )
     }
 }
 
