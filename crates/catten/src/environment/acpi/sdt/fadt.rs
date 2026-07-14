@@ -1,6 +1,6 @@
 use super::super::SdtHeader;
 use super::*;
-use crate::memory::PAddr;
+use crate::memory::PhysicalAddress;
 
 #[repr(C, packed)]
 pub struct Fadt {
@@ -62,11 +62,11 @@ pub struct Fadt {
 }
 
 impl Fadt {
-    pub fn get_dsdt_paddr(&self) -> PAddr {
+    pub fn get_dsdt_paddr(&self) -> PhysicalAddress {
         if self.x_dsdt != 0 {
-            PAddr::from(self.x_dsdt)
+            PhysicalAddress::from(self.x_dsdt)
         } else if self.dsdt != 0 {
-            PAddr::from(self.dsdt as u64)
+            PhysicalAddress::from(self.dsdt as u64)
         } else {
             panic!("[ACPI] The FADT does not contain a non-null physical address for the DSDT.");
         }

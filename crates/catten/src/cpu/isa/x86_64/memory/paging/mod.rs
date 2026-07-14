@@ -1,16 +1,30 @@
 pub mod pte;
 pub mod pth_walker;
-use core::arch::asm;
-use core::iter::Iterator;
-use core::ptr::NonNull;
+use core::{
+    arch::asm,
+    iter::Iterator,
+    ptr::NonNull,
+};
 
-use super::MemoryInterfaceImpl;
-use super::address::vaddr::VAddr;
-use crate::cpu::isa::interface::memory::address::Address;
-use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface, MemoryMapping};
-use crate::klib::size::{gibibytes, kibibytes, mebibytes};
-use crate::logln;
-use crate::memory::PAddr;
+use super::{
+    MemoryInterfaceImpl,
+    address::vaddr::VirtualAddress,
+};
+use crate::{
+    cpu::isa::interface::memory::{
+        AddressSpaceInterface,
+        MemoryInterface,
+        MemoryMapping,
+        address::Address,
+    },
+    klib::size::{
+        gibibytes,
+        kibibytes,
+        mebibytes,
+    },
+    logln,
+    memory::PhysicalAddress,
+};
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
@@ -91,7 +105,7 @@ impl AddressSpaceInterface for AddressSpace {
     fn find_free_region(
         &mut self,
         n_pages: usize,
-        range: (VAddr, VAddr),
+        range: (VirtualAddress, VirtualAddress),
     ) -> Result<
         <MemoryInterfaceImpl as MemoryInterface>::VAddr,
         <MemoryInterfaceImpl as MemoryInterface>::Error,
@@ -127,8 +141,8 @@ impl AddressSpaceInterface for AddressSpace {
     fn find_free_region_large_aligned(
         &mut self,
         n_large_pages: usize,
-        range: (VAddr, VAddr),
-    ) -> Result<VAddr, <MemoryInterfaceImpl as MemoryInterface>::Error> {
+        range: (VirtualAddress, VirtualAddress),
+    ) -> Result<VirtualAddress, <MemoryInterfaceImpl as MemoryInterface>::Error> {
         if range.0.is_aligned_to(Self::LARGE_PAGE_SIZE) == false
             || range.1.is_aligned_to(Self::LARGE_PAGE_SIZE) == false
         {
@@ -165,8 +179,8 @@ impl AddressSpaceInterface for AddressSpace {
     fn find_free_region_huge_aligned(
         &mut self,
         n_huge_pages: usize,
-        range: (VAddr, VAddr),
-    ) -> Result<VAddr, <MemoryInterfaceImpl as MemoryInterface>::Error> {
+        range: (VirtualAddress, VirtualAddress),
+    ) -> Result<VirtualAddress, <MemoryInterfaceImpl as MemoryInterface>::Error> {
         if range.0.is_aligned_to(Self::HUGE_PAGE_SIZE) == false
             || range.1.is_aligned_to(Self::HUGE_PAGE_SIZE) == false
         {
@@ -217,8 +231,8 @@ impl AddressSpaceInterface for AddressSpace {
     fn unmap_page(
         &mut self,
         vaddr: <MemoryInterfaceImpl as MemoryInterface>::VAddr,
-    ) -> Result<PAddr, <MemoryInterfaceImpl as MemoryInterface>::Error> {
-        if <VAddr as Into<usize>>::into(vaddr) == 0 {
+    ) -> Result<PhysicalAddress, <MemoryInterfaceImpl as MemoryInterface>::Error> {
+        if <VirtualAddress as Into<usize>>::into(vaddr) == 0 {
             return Err(<MemoryInterfaceImpl as MemoryInterface>::Error::NullVAddrNotAllowed);
         }
         if vaddr.page_offset() != 0 {
@@ -245,8 +259,8 @@ impl AddressSpaceInterface for AddressSpace {
     fn unmap_large_page(
         &mut self,
         vaddr: <MemoryInterfaceImpl as MemoryInterface>::VAddr,
-    ) -> Result<PAddr, <MemoryInterfaceImpl as MemoryInterface>::Error> {
-        if <VAddr as Into<usize>>::into(vaddr) == 0 {
+    ) -> Result<PhysicalAddress, <MemoryInterfaceImpl as MemoryInterface>::Error> {
+        if <VirtualAddress as Into<usize>>::into(vaddr) == 0 {
             return Err(<MemoryInterfaceImpl as MemoryInterface>::Error::NullVAddrNotAllowed);
         }
         if !vaddr.is_aligned_to(Self::LARGE_PAGE_SIZE) {
@@ -273,8 +287,8 @@ impl AddressSpaceInterface for AddressSpace {
     fn unmap_huge_page(
         &mut self,
         vaddr: <MemoryInterfaceImpl as MemoryInterface>::VAddr,
-    ) -> Result<PAddr, <MemoryInterfaceImpl as MemoryInterface>::Error> {
-        if <VAddr as Into<usize>>::into(vaddr) == 0 {
+    ) -> Result<PhysicalAddress, <MemoryInterfaceImpl as MemoryInterface>::Error> {
+        if <VirtualAddress as Into<usize>>::into(vaddr) == 0 {
             return Err(<MemoryInterfaceImpl as MemoryInterface>::Error::NullVAddrNotAllowed);
         }
         if !vaddr.is_aligned_to(Self::HUGE_PAGE_SIZE) {
@@ -312,7 +326,7 @@ impl AddressSpaceInterface for AddressSpace {
 
     fn is_mapped_large_page(
         &mut self,
-        vaddr: VAddr,
+        vaddr: VirtualAddress,
     ) -> Result<bool, <MemoryInterfaceImpl as MemoryInterface>::Error> {
         let mut walker = pth_walker::PthWalker::new(self, vaddr);
         match walker.walk_large_page() {
@@ -324,7 +338,7 @@ impl AddressSpaceInterface for AddressSpace {
 
     fn is_mapped_huge_page(
         &mut self,
-        vaddr: VAddr,
+        vaddr: VirtualAddress,
     ) -> Result<bool, <MemoryInterfaceImpl as MemoryInterface>::Error> {
         let mut walker = pth_walker::PthWalker::new(self, vaddr);
         match walker.walk_huge_page() {
@@ -336,8 +350,11 @@ impl AddressSpaceInterface for AddressSpace {
 
     fn translate_address(
         &mut self,
-        vaddr: super::address::vaddr::VAddr,
-    ) -> Result<super::address::paddr::PAddr, <MemoryInterfaceImpl as MemoryInterface>::Error> {
+        vaddr: super::address::vaddr::VirtualAddress,
+    ) -> Result<
+        super::address::paddr::PhysicalAddress,
+        <MemoryInterfaceImpl as MemoryInterface>::Error,
+    > {
         let mut walker = pth_walker::PthWalker::new(self, vaddr);
         match walker.walk() {
             Ok(_) => {

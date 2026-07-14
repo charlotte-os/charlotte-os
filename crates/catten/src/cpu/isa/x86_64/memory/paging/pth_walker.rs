@@ -8,10 +8,10 @@
 use core::ptr::NonNull;
 
 use super::{is_pagetable_unused, PAGE_SIZE};
-use crate::cpu::isa::interface::memory::address::VirtualAddress;
+use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface};
-use crate::cpu::isa::x86_64::memory::address::paddr::PAddr;
-use crate::cpu::isa::x86_64::memory::address::vaddr::VAddr;
+use crate::cpu::isa::x86_64::memory::address::paddr::PhysicalAddress;
+use crate::cpu::isa::x86_64::memory::address::vaddr::VirtualAddress;
 use crate::memory::PHYSICAL_FRAME_ALLOCATOR;
 
 const CR3_ADDRESS_MASK: u64 = 0x000ffffffffff000;
@@ -20,7 +20,7 @@ type WalkerResult<T> = Result<T, WalkerError>;
 
 pub struct PthWalker<'vas> {
     pub address_space: &'vas mut super::AddressSpace,
-    pub vaddr: VAddr,
+    pub vaddr: VirtualAddress,
     pub pml4_ptr: *mut super::PageTable,
     pub pdpt_ptr: *mut super::PageTable,
     pub pd_ptr: *mut super::PageTable,
@@ -29,7 +29,7 @@ pub struct PthWalker<'vas> {
 }
 
 impl<'vas> PthWalker<'vas> {
-    pub fn new(address_space: &'vas mut super::AddressSpace, vaddr: VAddr) -> Self {
+    pub fn new(address_space: &'vas mut super::AddressSpace, vaddr: VirtualAddress) -> Self {
         Self {
             address_space,
             vaddr,
@@ -50,7 +50,7 @@ impl<'vas> PthWalker<'vas> {
     }
 
     fn root_table_ptr(&self) -> *mut super::PageTable {
-        PAddr::try_from((self.address_space.cr3 & CR3_ADDRESS_MASK) as usize).unwrap().into()
+        PhysicalAddress::try_from((self.address_space.cr3 & CR3_ADDRESS_MASK) as usize).unwrap().into()
     }
 
     fn walk_next_level(
@@ -74,7 +74,7 @@ impl<'vas> PthWalker<'vas> {
 
     fn set_table_entry(
         entry: &mut super::pte::PageTableEntry,
-        frame: PAddr,
+        frame: PhysicalAddress,
         writable: bool,
         user_accessible: bool,
         no_execute: bool,
@@ -120,7 +120,7 @@ impl<'vas> PthWalker<'vas> {
             // higher half memory.
             if self.address_space.cr3 & CR3_ADDRESS_MASK == 0 {
                 let new_pml4 = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame().unwrap();
-                self.address_space.cr3 = <PAddr as Into<u64>>::into(new_pml4) & CR3_ADDRESS_MASK;
+                self.address_space.cr3 = <PhysicalAddress as Into<u64>>::into(new_pml4) & CR3_ADDRESS_MASK;
                 self.address_space.load().expect("Error reloading the CR3 register");
             }
             self.pml4_ptr = self.root_table_ptr();
@@ -180,7 +180,7 @@ impl<'vas> PthWalker<'vas> {
 
     pub fn map_page(
         &mut self,
-        frame: PAddr,
+        frame: PhysicalAddress,
         writable: bool,
         user_accessible: bool,
         no_execute: bool,
@@ -245,7 +245,7 @@ impl<'vas> PthWalker<'vas> {
             );
             // for those who may not immediately see it, this is the Rust equivalent of
             // memset being used to clear the newly mapped page
-            core::ptr::write_bytes(<PAddr as Into<*mut u8>>::into(frame), 0, PAGE_SIZE);
+            core::ptr::write_bytes(<PhysicalAddress as Into<*mut u8>>::into(frame), 0, PAGE_SIZE);
         }
         self.address_space.load().expect("Failed to reload the address space");
         unsafe {
@@ -259,7 +259,7 @@ impl<'vas> PthWalker<'vas> {
         Ok(())
     }
 
-    pub fn unmap_page(&mut self) -> WalkerResult<PAddr> {
+    pub fn unmap_page(&mut self) -> WalkerResult<PhysicalAddress> {
         match self.walk() {
             Ok(_) => {
                 unsafe {
@@ -310,7 +310,7 @@ impl<'vas> PthWalker<'vas> {
 
     pub fn map_large_page(
         &mut self,
-        frame: PAddr,
+        frame: PhysicalAddress,
         writable: bool,
         user_accessible: bool,
         no_execute: bool,
@@ -355,7 +355,7 @@ impl<'vas> PthWalker<'vas> {
         Ok(())
     }
 
-    pub fn unmap_large_page(&mut self) -> WalkerResult<PAddr> {
+    pub fn unmap_large_page(&mut self) -> WalkerResult<PhysicalAddress> {
         self.walk_large_page()?;
         unsafe {
             let pde = &raw mut (*self.pd_ptr)[self.vaddr.pd_index()];
@@ -368,7 +368,7 @@ impl<'vas> PthWalker<'vas> {
 
     pub fn map_huge_page(
         &mut self,
-        frame: PAddr,
+        frame: PhysicalAddress,
         writable: bool,
         user_accessible: bool,
         no_execute: bool,
@@ -403,7 +403,7 @@ impl<'vas> PthWalker<'vas> {
         Ok(())
     }
 
-    pub fn unmap_huge_page(&mut self) -> WalkerResult<PAddr> {
+    pub fn unmap_huge_page(&mut self) -> WalkerResult<PhysicalAddress> {
         self.walk_huge_page()?;
         unsafe {
             let pdpte = &raw mut (*self.pdpt_ptr)[self.vaddr.pdpt_index()];

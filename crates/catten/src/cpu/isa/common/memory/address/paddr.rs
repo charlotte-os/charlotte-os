@@ -1,28 +1,40 @@
-use core::ops::{Add, AddAssign, Sub};
+use core::ops::{
+    Add,
+    AddAssign,
+    Sub,
+};
 
-use crate::cpu::isa::interface::memory::address::{Address, PhysicalAddress, VirtualAddress};
-use crate::cpu::isa::memory::address::PADDR_MASK;
-use crate::memory::HHDM_BASE;
+use crate::{
+    cpu::isa::{
+        interface::memory::address::{
+            Address,
+            PhysicalAddressIfce,
+            VirtualAddressIfce,
+        },
+        memory::address::PADDR_MASK,
+    },
+    memory::HHDM_BASE,
+};
 
 #[derive(Debug, Clone, Copy)]
-pub enum PAddrError {
+pub enum PhysicalAddressError {
     OutOfCpuSupportedRange(usize),
 }
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PAddr {
+pub struct PhysicalAddress {
     raw: usize,
 }
 
-impl Address for PAddr {
-    const MAX: Self = PAddr {
+impl Address for PhysicalAddress {
+    const MAX: Self = PhysicalAddress {
         raw: usize::MAX,
     };
-    const MIN: Self = PAddr {
+    const MIN: Self = PhysicalAddress {
         raw: 0,
     };
-    const NULL: Self = PAddr {
+    const NULL: Self = PhysicalAddress {
         raw: 0,
     };
 
@@ -39,11 +51,11 @@ impl Address for PAddr {
     }
 
     fn next_aligned_to(&self, alignment: usize) -> Self {
-        unsafe { PAddr::from_unchecked(self.raw + (alignment - (self.raw % alignment))) }
+        unsafe { PhysicalAddress::from_unchecked(self.raw + (alignment - (self.raw % alignment))) }
     }
 
     fn prev_aligned_to(&self, alignment: usize) -> Self {
-        PAddr {
+        PhysicalAddress {
             raw: if alignment % 2 == 0 {
                 self.raw & !(alignment - 1)
             } else {
@@ -53,13 +65,13 @@ impl Address for PAddr {
     }
 
     unsafe fn from_unchecked(raw: usize) -> Self {
-        PAddr {
+        PhysicalAddress {
             raw,
         }
     }
 }
 
-impl PhysicalAddress for PAddr {
+impl PhysicalAddressIfce for PhysicalAddress {
     unsafe fn into_hhdm_ptr<T>(self) -> *const T {
         (*HHDM_BASE).into_ptr::<T>().wrapping_byte_add(self.raw)
     }
@@ -69,96 +81,96 @@ impl PhysicalAddress for PAddr {
     }
 }
 
-impl<T> Into<*const T> for PAddr {
+impl<T> Into<*const T> for PhysicalAddress {
     fn into(self) -> *const T {
         (*HHDM_BASE).into_ptr::<T>().wrapping_byte_add(self.raw)
     }
 }
 
-impl<T> Into<*mut T> for PAddr {
+impl<T> Into<*mut T> for PhysicalAddress {
     fn into(self) -> *mut T {
         (*HHDM_BASE).into_mut::<T>().wrapping_byte_add(self.raw)
     }
 }
 
-impl TryFrom<usize> for PAddr {
-    type Error = PAddrError;
+impl TryFrom<usize> for PhysicalAddress {
+    type Error = PhysicalAddressError;
 
-    fn try_from(value: usize) -> Result<Self, PAddrError> {
+    fn try_from(value: usize) -> Result<Self, PhysicalAddressError> {
         if value & !*PADDR_MASK != 0 {
-            Err(PAddrError::OutOfCpuSupportedRange(value))
+            Err(PhysicalAddressError::OutOfCpuSupportedRange(value))
         } else {
-            Ok(PAddr {
+            Ok(PhysicalAddress {
                 raw: value,
             })
         }
     }
 }
 
-impl Into<usize> for PAddr {
+impl Into<usize> for PhysicalAddress {
     fn into(self) -> usize {
         self.raw
     }
 }
 
-impl From<u64> for PAddr {
+impl From<u64> for PhysicalAddress {
     fn from(value: u64) -> Self {
-        PAddr {
+        PhysicalAddress {
             raw: value as usize & *PADDR_MASK,
         }
     }
 }
 
-impl Into<u64> for PAddr {
+impl Into<u64> for PhysicalAddress {
     fn into(self) -> u64 {
         self.raw as u64
     }
 }
 
-impl Add<isize> for PAddr {
-    type Output = PAddr;
+impl Add<isize> for PhysicalAddress {
+    type Output = PhysicalAddress;
 
     fn add(self, rhs: isize) -> Self::Output {
-        PAddr::try_from(self.raw.wrapping_add(rhs as usize)).unwrap()
+        PhysicalAddress::try_from(self.raw.wrapping_add(rhs as usize)).unwrap()
     }
 }
 
-impl<T> AddAssign<T> for PAddr
+impl<T> AddAssign<T> for PhysicalAddress
 where
-    PAddr: Add<T, Output = PAddr>,
+    PhysicalAddress: Add<T, Output = PhysicalAddress>,
 {
     fn add_assign(&mut self, rhs: T) {
         *self = *self + rhs;
     }
 }
 
-impl Sub<isize> for PAddr {
-    type Output = PAddr;
+impl Sub<isize> for PhysicalAddress {
+    type Output = PhysicalAddress;
 
     fn sub(self, rhs: isize) -> Self::Output {
-        PAddr::try_from(self.raw.wrapping_sub(rhs as usize)).unwrap()
+        PhysicalAddress::try_from(self.raw.wrapping_sub(rhs as usize)).unwrap()
     }
 }
 
-impl Add<usize> for PAddr {
-    type Output = PAddr;
+impl Add<usize> for PhysicalAddress {
+    type Output = PhysicalAddress;
 
     fn add(self, rhs: usize) -> Self::Output {
-        PAddr::try_from(self.raw.wrapping_add(rhs)).unwrap()
+        PhysicalAddress::try_from(self.raw.wrapping_add(rhs)).unwrap()
     }
 }
 
-impl Sub<usize> for PAddr {
-    type Output = PAddr;
+impl Sub<usize> for PhysicalAddress {
+    type Output = PhysicalAddress;
 
     fn sub(self, rhs: usize) -> Self::Output {
-        PAddr::try_from(self.raw.wrapping_sub(rhs)).unwrap()
+        PhysicalAddress::try_from(self.raw.wrapping_sub(rhs)).unwrap()
     }
 }
 
-impl Default for PAddr {
+impl Default for PhysicalAddress {
     fn default() -> Self {
-        PAddr {
+        PhysicalAddress {
             raw: 0,
         }
     }

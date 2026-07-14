@@ -6,10 +6,10 @@ use talc::base::binning::Binning;
 use talc::source::Source;
 use talc::*;
 
-use crate::cpu::isa::interface::memory::address::VirtualAddress;
+use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::cpu::multiprocessor::spin::mutex::MutexCore;
 use crate::klib::size::mebibytes;
-use crate::memory::VAddr;
+use crate::memory::VirtualAddress;
 use crate::memory::allocators::memory::{PageSize, try_allocate_and_map_range};
 use crate::memory::linear::address_map::LA_MAP;
 use crate::memory::linear::address_map::RegionType::KernelAllocatorArena;
@@ -91,7 +91,7 @@ unsafe impl Source for ExtendOnOom {
             (c.available_bytes),
             (c.allocated_bytes)
         );
-        let new_region_start = VAddr::from(curr_end as usize);
+        let new_region_start = VirtualAddress::from(curr_end as usize);
         let new_region_end = new_region_start + PageSize::Large.num_bytes();
         /* Actually allocate and map the new region */
         try_allocate_and_map_range(new_region_start, PageSize::Large, 1)

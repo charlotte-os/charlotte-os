@@ -1,6 +1,6 @@
 use crate::environment::acpi::sdt::madt::GlobalSystemInterrupt;
 use crate::environment::acpi::sdt::madt::entry_types::MadtEntryType;
-use crate::memory::PAddr;
+use crate::memory::PhysicalAddress;
 
 type IoApicId = u8;
 
@@ -22,8 +22,8 @@ impl IoApicEntry {
         self.ioapic_id
     }
 
-    pub fn address(&self) -> PAddr {
-        PAddr::from(self.ioapic_address as u64)
+    pub fn address(&self) -> PhysicalAddress {
+        PhysicalAddress::from(self.ioapic_address as u64)
     }
 
     pub fn gsi_base(&self) -> GlobalSystemInterrupt {

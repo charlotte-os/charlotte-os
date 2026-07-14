@@ -1,6 +1,6 @@
 use crate::cpu::isa::interface::memory::AddressSpaceInterface;
 use crate::logln;
-use crate::memory::linear::{MemoryMapping, PageType, VAddr};
+use crate::memory::linear::{MemoryMapping, PageType, VirtualAddress};
 use crate::memory::physical::*;
 use crate::memory::{AddressSpace, KERNEL_AS, PHYSICAL_FRAME_ALLOCATOR, physical};
 
@@ -39,15 +39,15 @@ impl PageSize {
 }
 
 pub fn try_allocate_and_map_range(
-    base: VAddr,
+    base: VirtualAddress,
     page_size: PageSize,
     num_pages: usize,
 ) -> Result<(), Error> {
     // lock the kernel address space for writing
     let mut kas = KERNEL_AS.lock();
     let mut mapping = MemoryMapping {
-        vaddr: VAddr::default(),
-        paddr: PAddr::default(),
+        vaddr: VirtualAddress::default(),
+        paddr: PhysicalAddress::default(),
         page_type: PageType::KernelData,
     };
     let alloc_func = match page_size {
@@ -90,7 +90,7 @@ pub fn try_allocate_and_map_range(
     Ok(())
 }
 
-pub fn unmap_and_deallocate_range(base: VAddr, page_size: PageSize, num_pages: usize) {
+pub fn unmap_and_deallocate_range(base: VirtualAddress, page_size: PageSize, num_pages: usize) {
     let mut kas = KERNEL_AS.lock();
     let dealloc_func = match page_size {
         PageSize::Standard => PhysicalFrameAllocator::deallocate_frame,

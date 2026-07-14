@@ -28,14 +28,14 @@ pub trait Address:
     unsafe fn from_unchecked(addr: usize) -> Self;
 }
 
-pub trait VirtualAddress: Address {
+pub trait VirtualAddressIfce: Address {
     fn from_ptr<T>(ptr: *const T) -> Self;
     fn from_mut<T>(ptr: *mut T) -> Self;
     fn into_ptr<T>(self) -> *const T;
     fn into_mut<T>(self) -> *mut T;
 }
 
-pub trait PhysicalAddress: Address {
+pub trait PhysicalAddressIfce: Address {
     unsafe fn into_hhdm_ptr<T>(self) -> *const T;
     unsafe fn into_hhdm_mut<T>(self) -> *mut T;
 }

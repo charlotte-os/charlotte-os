@@ -1,9 +1,21 @@
-use crate::cpu::isa::interface::memory::AddressSpaceInterface;
-use crate::cpu::isa::interface::memory::address::VirtualAddress;
-use crate::cpu::isa::memory::paging::AddressSpace;
-use crate::logln;
-use crate::memory::PHYSICAL_FRAME_ALLOCATOR;
-use crate::memory::linear::{MemoryMapping, PageType, VAddr};
+use crate::{
+    cpu::isa::{
+        interface::memory::{
+            AddressSpaceInterface,
+            address::VirtualAddressIfce,
+        },
+        memory::paging::AddressSpace,
+    },
+    logln,
+    memory::{
+        PHYSICAL_FRAME_ALLOCATOR,
+        linear::{
+            MemoryMapping,
+            PageType,
+            VirtualAddress,
+        },
+    },
+};
 
 pub fn test_vmem() {
     let hhdm = 0xffff8000003ffff8usize as *const usize;
@@ -29,7 +41,7 @@ pub fn test_vmem() {
     let mut current_as = AddressSpace::get_current();
     logln!("Obtained current address space.");
     logln!("Creating MemoryMapping struct.");
-    let higher_half_start: VAddr = VAddr::from(0xffff_ffff_ffff_f000usize);
+    let higher_half_start: VirtualAddress = VirtualAddress::from(0xffff_ffff_ffff_f000usize);
     let mapping = MemoryMapping {
         vaddr: higher_half_start,
         paddr: frame,

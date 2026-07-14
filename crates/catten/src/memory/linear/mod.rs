@@ -1,7 +1,7 @@
 pub mod address_map;
 
-pub use crate::cpu::isa::memory::address::paddr::PAddr;
-pub use crate::cpu::isa::memory::address::vaddr::VAddr;
+pub use crate::cpu::isa::memory::address::paddr::PhysicalAddress;
+pub use crate::cpu::isa::memory::address::vaddr::VirtualAddress;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
@@ -65,7 +65,7 @@ impl PageType {
 }
 #[derive(Debug, Clone)]
 pub struct MemoryMapping {
-    pub vaddr: VAddr,
-    pub paddr: PAddr,
+    pub vaddr: VirtualAddress,
+    pub paddr: PhysicalAddress,
     pub page_type: PageType,
 }

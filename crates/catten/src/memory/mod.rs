@@ -4,8 +4,8 @@ pub mod allocators;
 pub mod linear;
 pub mod physical;
 
-pub use linear::VAddr;
-pub use physical::{MemoryInterface, PAddr, PhysicalFrameAllocator};
+pub use linear::VirtualAddress;
+pub use physical::{MemoryInterface, PhysicalAddress, PhysicalFrameAllocator};
 pub use spin::{LazyLock, Mutex, RwLock};
 
 pub use crate::cpu::isa::interface::memory::AddressSpaceInterface;
@@ -32,8 +32,8 @@ pub static ADDRESS_SPACE_TABLE: LazyLock<AddressSpaceTable> = LazyLock::new(Addr
 /// This should be remapped by the VMM during BSP init to be placed at the address specified by the
 /// kernel virtual memory map at which point this address should be updated to reflect the new
 /// location.
-pub static HHDM_BASE: LazyLock<VAddr> = LazyLock::new(|| {
-    VAddr::from(
+pub static HHDM_BASE: LazyLock<VirtualAddress> = LazyLock::new(|| {
+    VirtualAddress::from(
         HHDM_REQUEST
             .response()
             .expect("Limine failed to provide a higher half direct mapping region.")

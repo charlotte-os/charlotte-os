@@ -3,12 +3,12 @@ use core::mem::{offset_of, transmute};
 const INIT_KERNEL_STACK_PAGES: usize = 16;
 
 use crate::cpu::isa::init::gdt::{USER_CODE_SELECTOR, USER_DATA_SELECTOR};
-use crate::cpu::isa::interface::memory::address::VirtualAddress;
+use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::cpu::isa::lp::ops::{kernel_thread_trampoline, user_trampoline};
 use crate::cpu::isa::memory::paging::PAGE_SIZE;
 use crate::klib::collections::id_table;
 use crate::memory::allocators::stack_allocator::{allocate_stack, deallocate_stack};
-use crate::memory::{ADDRESS_SPACE_TABLE, AddressSpaceId, KERNEL_AS, VAddr};
+use crate::memory::{ADDRESS_SPACE_TABLE, AddressSpaceId, KERNEL_AS, VirtualAddress};
 
 /// # Interrupt stack frame structure for x86_64 architecture
 /// Note: must be 16 byte aligned as per `AMD APM 8.9.3`
@@ -27,7 +27,7 @@ struct UserEntryFrames {
 }
 
 impl UserEntryFrames {
-    fn new(asp: AddressSpaceId, entry_point: u64, iretq_rsp: VAddr, flags: u64) -> Self {
+    fn new(asp: AddressSpaceId, entry_point: u64, iretq_rsp: VirtualAddress, flags: u64) -> Self {
         UserEntryFrames {
             cr3: ADDRESS_SPACE_TABLE
                 .get(asp)
@@ -42,12 +42,12 @@ impl UserEntryFrames {
             rip: entry_point,
             cs: USER_CODE_SELECTOR as u64,
             rflags: flags,
-            rsp: <VAddr as Into<u64>>::into(iretq_rsp),
+            rsp: <VirtualAddress as Into<u64>>::into(iretq_rsp),
             ss: USER_DATA_SELECTOR as u64,
         }
     }
 
-    fn push_to_stack(self, rsp: &mut VAddr) {
+    fn push_to_stack(self, rsp: &mut VirtualAddress) {
         let new_rsp = *rsp - core::mem::size_of::<UserEntryFrames>();
         unsafe {
             let isf_ptr = new_rsp.into_mut::<UserEntryFrames>();
@@ -77,7 +77,7 @@ impl KernelEntryFrame {
         }
     }
 
-    fn push_to_stack(self, rsp: &mut VAddr) {
+    fn push_to_stack(self, rsp: &mut VirtualAddress) {
         let new_rsp = *rsp - core::mem::size_of::<KernelEntryFrame>();
         unsafe {
             let kef_ptr = new_rsp.into_mut::<KernelEntryFrame>();
@@ -109,8 +109,8 @@ impl From<id_table::Error> for Error {
 #[derive(Debug, Clone, Default)]
 pub struct ThreadContext {
     pub rsp_cpl0: u64,
-    _kernel_stack_buf: VAddr,
-    _user_stack_buf: Option<VAddr>,
+    _kernel_stack_buf: VirtualAddress,
+    _user_stack_buf: Option<VirtualAddress>,
 }
 
 impl Drop for ThreadContext {
@@ -139,8 +139,8 @@ impl ThreadContext {
         let mut kernel_stack_top = kernel_stack_buf + INIT_KERNEL_STACK_PAGES * PAGE_SIZE;
         isf.push_to_stack(&mut kernel_stack_top);
         Ok(ThreadContext {
-            rsp_cpl0: <VAddr as Into<u64>>::into(kernel_stack_top),
-            _kernel_stack_buf: VAddr::default(),
+            rsp_cpl0: <VirtualAddress as Into<u64>>::into(kernel_stack_top),
+            _kernel_stack_buf: VirtualAddress::default(),
             _user_stack_buf: Some(user_stack_buf),
         })
     }
@@ -152,7 +152,7 @@ impl ThreadContext {
         let ksf = KernelEntryFrame::new(KERNEL_AS.lock().get_cr3(), entry_point as u64);
         ksf.push_to_stack(&mut kernel_stack_top);
         Ok(ThreadContext {
-            rsp_cpl0: <VAddr as Into<u64>>::into(kernel_stack_top),
+            rsp_cpl0: <VirtualAddress as Into<u64>>::into(kernel_stack_top),
             _kernel_stack_buf: kernel_stack_buf,
             _user_stack_buf: None,
         })

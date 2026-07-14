@@ -6,15 +6,28 @@
 use limine::memmap::MEMMAP_USABLE;
 pub use limine::request::MemmapResponse;
 
-pub use crate::cpu::isa::interface::memory::MemoryInterface;
-use crate::cpu::isa::interface::memory::address::Address;
-pub use crate::cpu::isa::interface::memory::address::PhysicalAddress;
-pub use crate::cpu::isa::memory::MemoryInterfaceImpl;
-pub use crate::cpu::isa::memory::address::paddr::{PAddr, PAddrError};
-use crate::early_logln;
-use crate::klib::constants::BITS_PER_BYTE;
-use crate::klib::size::kibibytes;
-use crate::memory::allocators::memory::PageSize;
+pub use crate::cpu::isa::{
+    interface::memory::{
+        MemoryInterface,
+        address::PhysicalAddressIfce,
+    },
+    memory::{
+        MemoryInterfaceImpl,
+        address::paddr::{
+            PhysicalAddress,
+            PhysicalAddressError,
+        },
+    },
+};
+use crate::{
+    cpu::isa::interface::memory::address::Address,
+    early_logln,
+    klib::{
+        constants::BITS_PER_BYTE,
+        size::kibibytes,
+    },
+    memory::allocators::memory::PageSize,
+};
 
 /// Page frames are 4 KiB in size on all supported architectures.
 const PAGE_FRAME_SIZE: usize = kibibytes(4);
@@ -34,11 +47,11 @@ pub enum Error {
     CannotDeallocateUnallocatedFrame,
     FrameAlreadyInUse,
     NoOp,
-    PAddrError(PAddrError),
+    PAddrError(PhysicalAddressError),
 }
 
-impl From<PAddrError> for Error {
-    fn from(err: PAddrError) -> Self {
+impl From<PhysicalAddressError> for Error {
+    fn from(err: PhysicalAddressError) -> Self {
         Error::PAddrError(err)
     }
 }
@@ -53,8 +66,8 @@ pub struct PhysicalFrameAllocator {
 unsafe impl Send for PhysicalFrameAllocator {}
 
 impl PhysicalFrameAllocator {
-    pub fn mark_frame_unavailable(&mut self, frame_addr: PAddr) -> Result<(), Error> {
-        if <PAddr as Into<usize>>::into(frame_addr) % PAGE_FRAME_SIZE != 0 {
+    pub fn mark_frame_unavailable(&mut self, frame_addr: PhysicalAddress) -> Result<(), Error> {
+        if <PhysicalAddress as Into<usize>>::into(frame_addr) % PAGE_FRAME_SIZE != 0 {
             return Err(Error::MisalignedPhysicalAddress);
         }
         let idx = addr_to_bitmap_index(frame_addr)?;
@@ -71,7 +84,7 @@ impl PhysicalFrameAllocator {
         }
     }
 
-    pub fn allocate_frame(&mut self) -> Result<PAddr, Error> {
+    pub fn allocate_frame(&mut self) -> Result<PhysicalAddress, Error> {
         // Scan from the hint forward, then wrap around if needed
         if let Some(result) = self.scan_for_free_frame(self.next_free_hint, self.bitmap_len) {
             return result;
@@ -84,7 +97,11 @@ impl PhysicalFrameAllocator {
         Err(Error::OutOfFrames)
     }
 
-    fn scan_for_free_frame(&mut self, start: usize, end: usize) -> Option<Result<PAddr, Error>> {
+    fn scan_for_free_frame(
+        &mut self,
+        start: usize,
+        end: usize,
+    ) -> Option<Result<PhysicalAddress, Error>> {
         for byte_idx in start..end {
             unsafe {
                 let curr_byte_ptr = self.bitmap_ptr.add(byte_idx);
@@ -103,7 +120,7 @@ impl PhysicalFrameAllocator {
                             hb
                         );
                     }
-                    return Some(PAddr::try_from(raw_addr).map_err(Error::from));
+                    return Some(PhysicalAddress::try_from(raw_addr).map_err(Error::from));
                 }
             }
         }
@@ -111,7 +128,7 @@ impl PhysicalFrameAllocator {
     }
 
     #[inline]
-    fn is_containing_frame_available(&self, addr: PAddr) -> Result<bool, Error> {
+    fn is_containing_frame_available(&self, addr: PhysicalAddress) -> Result<bool, Error> {
         let (byte_idx, bit_idx) = addr_to_bitmap_index(addr.prev_aligned_to(PAGE_FRAME_SIZE))?;
         unsafe {
             let byte = self.bitmap_ptr.offset(byte_idx as isize).read_volatile();
@@ -120,7 +137,11 @@ impl PhysicalFrameAllocator {
     }
 
     #[inline]
-    fn mark_frames_unavailable(&mut self, start_addr: PAddr, nframes: usize) -> Result<(), Error> {
+    fn mark_frames_unavailable(
+        &mut self,
+        start_addr: PhysicalAddress,
+        nframes: usize,
+    ) -> Result<(), Error> {
         for i in 0..nframes {
             self.mark_frame_unavailable(start_addr + (i * PAGE_FRAME_SIZE) as isize)?;
         }
@@ -131,7 +152,7 @@ impl PhysicalFrameAllocator {
         &mut self,
         nframes: usize,
         alignment: usize,
-    ) -> Result<PAddr, Error> {
+    ) -> Result<PhysicalAddress, Error> {
         if nframes == 0 {
             Err(Error::NoOp)
         } else if nframes / BITS_PER_BYTE > self.bitmap_len {
@@ -147,7 +168,9 @@ impl PhysicalFrameAllocator {
                 for fb in (start_frame_base..(start_frame_base + nframes * PAGE_FRAME_SIZE))
                     .step_by(PAGE_FRAME_SIZE)
                 {
-                    if !self.is_containing_frame_available(PAddr::try_from(fb as usize).unwrap())? {
+                    if !self.is_containing_frame_available(
+                        PhysicalAddress::try_from(fb as usize).unwrap(),
+                    )? {
                         start_frame_base += alignment;
                         break;
                     } else if fb == start_frame_base + (nframes - 1) * PAGE_FRAME_SIZE {
@@ -156,14 +179,14 @@ impl PhysicalFrameAllocator {
                     }
                 }
             }
-            let start_addr = PAddr::try_from(start_frame_base)?;
+            let start_addr = PhysicalAddress::try_from(start_frame_base)?;
             self.mark_frames_unavailable(start_addr, nframes)?;
             Ok(start_addr) // Placeholder
         }
     }
 
-    pub fn deallocate_frame(&mut self, frame_addr: PAddr) -> Result<(), Error> {
-        if <PAddr as Into<usize>>::into(frame_addr.clone()) % PAGE_FRAME_SIZE != 0 {
+    pub fn deallocate_frame(&mut self, frame_addr: PhysicalAddress) -> Result<(), Error> {
+        if <PhysicalAddress as Into<usize>>::into(frame_addr.clone()) % PAGE_FRAME_SIZE != 0 {
             return Err(Error::MisalignedPhysicalAddress);
         }
         if let Ok(idx) = addr_to_bitmap_index(frame_addr) {
@@ -184,34 +207,34 @@ impl PhysicalFrameAllocator {
         }
     }
 
-    pub fn allocate_large_frame(&mut self) -> Result<PAddr, Error> {
+    pub fn allocate_large_frame(&mut self) -> Result<PhysicalAddress, Error> {
         let r = self.allocate_contiguous(
             PageSize::Large.num_bytes() / PAGE_FRAME_SIZE,
             PageSize::Large.num_bytes(),
         );
         if let Ok(ref frame) = r {
-            let raw: usize = <PAddr as Into<usize>>::into(frame.clone());
+            let raw: usize = <PhysicalAddress as Into<usize>>::into(frame.clone());
             crate::early_logln!("[HEAPDBG] allocate_large_frame -> {:#x}", raw);
             HEAP_PHYS_BASE.store(raw, core::sync::atomic::Ordering::Relaxed);
         }
         r
     }
 
-    pub fn deallocate_large_frame(&mut self, frame_addr: PAddr) -> Result<(), Error> {
+    pub fn deallocate_large_frame(&mut self, frame_addr: PhysicalAddress) -> Result<(), Error> {
         for i in 0..(PageSize::Large.num_bytes() / PAGE_FRAME_SIZE) {
             self.deallocate_frame(frame_addr + (i * PAGE_FRAME_SIZE) as isize)?;
         }
         Ok(())
     }
 
-    pub fn allocate_huge_frame(&mut self) -> Result<PAddr, Error> {
+    pub fn allocate_huge_frame(&mut self) -> Result<PhysicalAddress, Error> {
         self.allocate_contiguous(
             PageSize::Huge.num_bytes() / PAGE_FRAME_SIZE,
             PageSize::Huge.num_bytes(),
         )
     }
 
-    pub fn deallocate_huge_frame(&mut self, frame_addr: PAddr) -> Result<(), Error> {
+    pub fn deallocate_huge_frame(&mut self, frame_addr: PhysicalAddress) -> Result<(), Error> {
         for i in 0..(PageSize::Huge.num_bytes() / PAGE_FRAME_SIZE) {
             self.deallocate_frame(frame_addr + (i * PAGE_FRAME_SIZE) as isize)?;
         }
@@ -220,7 +243,7 @@ impl PhysicalFrameAllocator {
 
     pub fn allocate_frames(
         &mut self,
-        frame_addrs: &mut [PAddr],
+        frame_addrs: &mut [PhysicalAddress],
         page_size: PageSize,
     ) -> Result<(), Error> {
         let alloc_fn = match page_size {
@@ -237,7 +260,7 @@ impl PhysicalFrameAllocator {
 
     pub fn deallocate_frames(
         &mut self,
-        frame_addrs: &[PAddr],
+        frame_addrs: &[PhysicalAddress],
         page_size: PageSize,
     ) -> Result<(), Error> {
         let dealloc_fn = match page_size {
@@ -260,7 +283,7 @@ impl From<&MemmapResponse> for PhysicalFrameAllocator {
         let bitmap_size = compute_bitmap_size(response);
         early_logln!("PhysicalFrameAllocator bitmap size: {:?} bytes", bitmap_size);
         early_logln!("Finding best fit memory location for the PhysicalFrameAllocator bitmap...");
-        let bitmap_addr: PAddr = find_mmap_best_fit(response, bitmap_size).unwrap();
+        let bitmap_addr: PhysicalAddress = find_mmap_best_fit(response, bitmap_size).unwrap();
         early_logln!("PhysicalFrameAllocator bitmap addr (physical): {:?}", bitmap_addr);
         let pfa = PhysicalFrameAllocator {
             bitmap_ptr: unsafe { bitmap_addr.into_hhdm_mut::<u8>() },
@@ -297,16 +320,16 @@ impl From<&MemmapResponse> for PhysicalFrameAllocator {
 }
 
 fn compute_bitmap_size(mmap: &MemmapResponse) -> usize {
-    let mut highest_address: PAddr = unsafe { PAddr::from_unchecked(0usize) };
+    let mut highest_address: PhysicalAddress = unsafe { PhysicalAddress::from_unchecked(0usize) };
     // Find the highest address in the memory map.
     for entry in mmap.entries().iter() {
         let entry_end = entry.base + entry.length;
-        if entry_end > <PAddr as Into<usize>>::into(highest_address) as u64 {
-            highest_address = unsafe { PAddr::from_unchecked(entry_end as usize) };
+        if entry_end > <PhysicalAddress as Into<usize>>::into(highest_address) as u64 {
+            highest_address = unsafe { PhysicalAddress::from_unchecked(entry_end as usize) };
         }
     }
     // Compute the size of the bitmap needed to track all frames up to the highest address.
-    let haddr_raw = <PAddr as Into<usize>>::into(highest_address);
+    let haddr_raw = <PhysicalAddress as Into<usize>>::into(highest_address);
     let num_pages = haddr_raw / PAGE_FRAME_SIZE
         + if haddr_raw % PAGE_FRAME_SIZE > 0 {
             1
@@ -324,29 +347,29 @@ fn compute_bitmap_size(mmap: &MemmapResponse) -> usize {
 
 // Helper functions
 
-fn find_mmap_best_fit(mmap: &MemmapResponse, size: usize) -> Result<PAddr, Error> {
-    let mut best_fit = PAddr::try_from(0usize)?;
+fn find_mmap_best_fit(mmap: &MemmapResponse, size: usize) -> Result<PhysicalAddress, Error> {
+    let mut best_fit = PhysicalAddress::try_from(0usize)?;
     let mut best_fit_size = 0;
     for entry in mmap.entries().iter() {
         let entry_size = entry.length;
         if entry_size >= size as u64 && (best_fit_size == 0 || entry_size < best_fit_size) {
-            best_fit = PAddr::try_from(entry.base as usize)?;
+            best_fit = PhysicalAddress::try_from(entry.base as usize)?;
             best_fit_size = entry_size;
         }
     }
-    if best_fit == PAddr::try_from(0usize)? {
+    if best_fit == PhysicalAddress::try_from(0usize)? {
         Err(Error::UnableToAllocateTrackingStructure)
     } else {
         Ok(best_fit)
     }
 }
 
-fn addr_to_bitmap_index(addr: PAddr) -> Result<(usize, usize), Error> {
-    if <PAddr as Into<usize>>::into(addr) % PAGE_FRAME_SIZE != 0 {
+fn addr_to_bitmap_index(addr: PhysicalAddress) -> Result<(usize, usize), Error> {
+    if <PhysicalAddress as Into<usize>>::into(addr) % PAGE_FRAME_SIZE != 0 {
         return Err(Error::MisalignedPhysicalAddress);
     }
 
-    let bit_index = <PAddr as Into<usize>>::into(addr) >> 12; // divide by PAGE_FRAME_SIZE
+    let bit_index = <PhysicalAddress as Into<usize>>::into(addr) >> 12; // divide by PAGE_FRAME_SIZE
 
     let byte_index = bit_index / BITS_PER_BYTE;
     let bit_offset = bit_index % BITS_PER_BYTE;
@@ -362,7 +385,7 @@ fn init_bitmap_from_mmap(bitmap_ptr: *mut u8, mmap: &MemmapResponse) {
             for i in (start..end).step_by(PAGE_FRAME_SIZE) {
                 //logln!("Marking frame at physical address {:?} as available...", i);
                 let (byte_index, bit_offset) =
-                    addr_to_bitmap_index(PAddr::try_from(i as usize).unwrap()).unwrap();
+                    addr_to_bitmap_index(PhysicalAddress::try_from(i as usize).unwrap()).unwrap();
                 unsafe {
                     *(bitmap_ptr.offset(byte_index as isize)) &= !(1 << bit_offset);
                 }
@@ -371,7 +394,7 @@ fn init_bitmap_from_mmap(bitmap_ptr: *mut u8, mmap: &MemmapResponse) {
     }
 }
 
-fn mark_pfa_bitmap_unusable(bitmap_ptr: *mut u8, base: PAddr, length: usize) {
+fn mark_pfa_bitmap_unusable(bitmap_ptr: *mut u8, base: PhysicalAddress, length: usize) {
     let n_pages = if length % PAGE_FRAME_SIZE > 0 {
         length / PAGE_FRAME_SIZE + 1
     } else {

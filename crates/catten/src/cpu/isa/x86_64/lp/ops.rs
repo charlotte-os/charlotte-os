@@ -120,10 +120,10 @@ pub fn get_lp_id() -> LpId {
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::cpu::scheduler::threads::MASTER_THREAD_TABLE;
 use crate::logln;
-use crate::memory::VAddr;
+use crate::memory::VirtualAddress;
 
 #[inline]
-pub extern "C" fn get_lp_local_base() -> VAddr {
+pub extern "C" fn get_lp_local_base() -> VirtualAddress {
     let ret: u64;
     unsafe {
         core::arch::asm!(
@@ -132,15 +132,15 @@ pub extern "C" fn get_lp_local_base() -> VAddr {
             options(nomem, nostack, preserves_flags)
         );
     }
-    VAddr::from(ret)
+    VirtualAddress::from(ret)
 }
 
 #[inline]
-pub extern "C" fn set_lp_local_base(base: VAddr) {
+pub extern "C" fn set_lp_local_base(base: VirtualAddress) {
     unsafe {
         core::arch::asm!(
             "wrgsbase {}",
-            in(reg) <VAddr as Into<u64>>::into(base),
+            in(reg) <VirtualAddress as Into<u64>>::into(base),
             options(nomem, nostack, preserves_flags)
         )
     }

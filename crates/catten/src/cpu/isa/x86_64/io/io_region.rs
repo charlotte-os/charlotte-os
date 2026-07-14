@@ -1,5 +1,5 @@
 use crate::cpu::isa::io::IoReg8;
-use crate::memory::{PAddr, VAddr};
+use crate::memory::{PhysicalAddress, VirtualAddress};
 
 pub type IoPortAddr = u16;
 pub type IoUSize = u16;
@@ -10,11 +10,11 @@ pub enum IoRegion {
         len: IoUSize,
     },
     HhdmMmio {
-        start: PAddr,
+        start: PhysicalAddress,
         len: usize,
     },
     MappedMmio {
-        start: VAddr,
+        start: VirtualAddress,
         len: usize,
     },
 }

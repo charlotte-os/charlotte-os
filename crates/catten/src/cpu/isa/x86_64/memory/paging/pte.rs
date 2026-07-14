@@ -2,7 +2,7 @@
 
 use spin::LazyLock;
 
-use crate::cpu::isa::x86_64::memory::address::paddr::PAddr;
+use crate::cpu::isa::x86_64::memory::address::paddr::PhysicalAddress;
 
 /// PTE component indexes and masks
 const PRESENT_BIT_INDEX: u64 = 0;
@@ -32,7 +32,7 @@ impl PageTableEntry {
         user_accessible: bool,
         pat_index: u8,
         global: bool,
-        frame_addr: PAddr,
+        frame_addr: PhysicalAddress,
     ) -> Self {
         let mut pte = Self(0);
         pte.set_present(present)
@@ -50,7 +50,7 @@ impl PageTableEntry {
         user_accessible: bool,
         pat_index: u8,
         global: bool,
-        frame_addr: PAddr,
+        frame_addr: PhysicalAddress,
     ) -> Self {
         let mut pte = Self(0);
         pte.set_present(present)
@@ -176,13 +176,13 @@ impl PageTableEntry {
         self
     }
 
-    pub fn try_get_frame(&self) -> Result<PAddr, super::super::Error> {
-        Ok(PAddr::try_from((self.0 & *FRAME_ADDR_MASK) as usize)?)
+    pub fn try_get_frame(&self) -> Result<PhysicalAddress, super::super::Error> {
+        Ok(PhysicalAddress::try_from((self.0 & *FRAME_ADDR_MASK) as usize)?)
     }
 
-    pub fn set_frame(&mut self, frame: PAddr) -> &mut Self {
+    pub fn set_frame(&mut self, frame: PhysicalAddress) -> &mut Self {
         self.0 =
-            (self.0 & !*FRAME_ADDR_MASK) | ((<PAddr as Into<u64>>::into(frame)) & *FRAME_ADDR_MASK);
+            (self.0 & !*FRAME_ADDR_MASK) | ((<PhysicalAddress as Into<u64>>::into(frame)) & *FRAME_ADDR_MASK);
         self
     }
 

@@ -1,7 +1,7 @@
 use crate::cpu::isa::init::gdt;
 use crate::cpu::isa::interrupts::idt::Idt;
 use crate::logln;
-use crate::memory::VAddr;
+use crate::memory::VirtualAddress;
 
 pub fn set_gates(idt: &mut Idt) {
     idt.set_gate(0, isr_divide_by_zero, gdt::KERNEL_CODE_SELECTOR, None, true, true);
@@ -127,7 +127,7 @@ extern "C" fn ih_invalid_tss() {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn ih_segment_not_present(error_code: u64, address: VAddr) {
+extern "C" fn ih_segment_not_present(error_code: u64, address: VirtualAddress) {
     panic!(
         "Segment not present exception occurred at address 0x{address:?} with segment selector \
          index {error_code}"
@@ -141,7 +141,7 @@ extern "C" fn ih_stack_segment_fault() {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn ih_general_protection_fault(error_code: u64, fault_addr: VAddr, rax_val: u64) {
+extern "C" fn ih_general_protection_fault(error_code: u64, fault_addr: VirtualAddress, rax_val: u64) {
     panic!(
         "General protection fault occurred at virtual address=0x{fault_addr:x?} with error \
          code=0x{error_code:x}, and RAX=0x{rax_val:x}."
@@ -149,7 +149,7 @@ extern "C" fn ih_general_protection_fault(error_code: u64, fault_addr: VAddr, ra
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn ih_page_fault(error_code: u64, fault_addr: VAddr, cr2: VAddr) {
+extern "C" fn ih_page_fault(error_code: u64, fault_addr: VirtualAddress, cr2: VirtualAddress) {
     panic!(
         "Page fault at RIP={fault_addr:?} and faulting address={cr2:?} with error code \
          0b{error_code:b}"

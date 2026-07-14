@@ -9,7 +9,7 @@ use core::{
 
 use crate::{
     cpu::{
-        isa::interface::memory::address::VirtualAddress,
+        isa::interface::memory::address::VirtualAddressIfce,
         multiprocessor::spin::mutex::Mutex as SpinMutex,
     },
     device_management::drivers::busses::pci_express::{
@@ -22,8 +22,8 @@ use crate::{
     },
     logln,
     memory::{
-        PAddr,
-        VAddr,
+        PhysicalAddress,
+        VirtualAddress,
     },
 };
 
@@ -137,7 +137,7 @@ impl PcieTopology {
         bus_segment: PcieBusSegmentNum,
         device_num: PcieDeviceNum,
         function_num: PcieFunctionNum,
-    ) -> Result<VAddr, Error> {
+    ) -> Result<VirtualAddress, Error> {
         let segment_group = self
             .segments
             .iter()
@@ -159,8 +159,8 @@ impl PcieTopology {
 #[derive(Debug)]
 pub struct PcieSegmentGroup {
     pcie_segment_group_num: PcieSegmentGroupNum,
-    ecam_vaddr: VAddr, /* Virtual address where this segment's ECAM is mapped in the kernel's
-                        * address space */
+    ecam_vaddr: VirtualAddress, /* Virtual address where this segment's ECAM is mapped in the
+                                 * kernel's address space */
     start_bus_num: PcieBusSegmentNum,
     end_bus_num: PcieBusSegmentNum,
     root_bus: Box<PcieBusSegment>, /* Root bus of this segment's topology; the rest of the
@@ -171,7 +171,7 @@ pub struct PcieSegmentGroup {
 impl PcieSegmentGroup {
     pub fn new(
         pcie_segment_group_num: PcieSegmentGroupNum,
-        ecam_paddr: PAddr,
+        ecam_paddr: PhysicalAddress,
         start_bus_num: PcieBusSegmentNum,
         end_bus_num: PcieBusSegmentNum,
     ) -> Self {
@@ -198,7 +198,7 @@ pub struct PcieBusSegment {
 
 impl PcieBusSegment {
     fn new(
-        ecam_vaddr: VAddr,
+        ecam_vaddr: VirtualAddress,
         segment_group_num: PcieSegmentGroupNum,
         bus_num: PcieBusSegmentNum,
     ) -> Self {
@@ -235,7 +235,7 @@ pub enum PcieDevice {
 
 impl PcieDevice {
     fn new(
-        ecam_vaddr: VAddr,
+        ecam_vaddr: VirtualAddress,
         segment_group_num: PcieSegmentGroupNum,
         bus_num: PcieBusSegmentNum,
         device_num: u8,
@@ -278,7 +278,7 @@ pub struct PcieSingleFuncDevice {
 
 impl PcieSingleFuncDevice {
     fn new(
-        ecam_vaddr: VAddr,
+        ecam_vaddr: VirtualAddress,
         segment_group_num: PcieSegmentGroupNum,
         bus_num: PcieBusSegmentNum,
         device_num: u8,
@@ -304,7 +304,7 @@ pub struct PcieMultiFuncDevice {
 
 impl PcieMultiFuncDevice {
     fn new(
-        ecam_vaddr: VAddr,
+        ecam_vaddr: VirtualAddress,
         segment_group_num: PcieSegmentGroupNum,
         bus_num: PcieBusSegmentNum,
         device_num: u8,
@@ -335,8 +335,8 @@ const MAX_EXT_BARS: usize = 3;
 
 #[derive(Clone, Copy)]
 union BarIoAddrs {
-    pub bar32: [Option<VAddr>; MAX_BAR_NUM],
-    pub bar64: [Option<VAddr>; MAX_EXT_BARS],
+    pub bar32: [Option<VirtualAddress>; MAX_BAR_NUM],
+    pub bar64: [Option<VirtualAddress>; MAX_EXT_BARS],
 }
 
 impl core::fmt::Debug for BarIoAddrs {
@@ -361,7 +361,7 @@ pub enum PcieFunction {
 
 impl PcieFunction {
     fn new(
-        ecam_vaddr: VAddr,
+        ecam_vaddr: VirtualAddress,
         segment_group_num: PcieSegmentGroupNum,
         bus_num: PcieBusSegmentNum,
         device_num: u8,
@@ -411,7 +411,7 @@ pub struct PcieEndpoint {
 
 impl PcieEndpoint {
     fn new(
-        ecam_vaddr: VAddr,
+        ecam_vaddr: VirtualAddress,
         segment_group_num: PcieSegmentGroupNum,
         bus_num: PcieBusSegmentNum,
         device_num: u8,

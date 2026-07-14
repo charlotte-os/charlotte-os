@@ -6,10 +6,10 @@ mod interrupt_flags;
 use alloc::vec::Vec;
 use core::ptr::NonNull;
 
-use crate::cpu::isa::interface::memory::address::VirtualAddress;
+use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::environment::acpi::SdtHeader;
 use crate::environment::acpi::sdt::madt::entry_types::MadtEntryType;
-use crate::memory::VAddr;
+use crate::memory::VirtualAddress;
 
 type GlobalSystemInterrupt = u32;
 
@@ -22,7 +22,7 @@ struct MadtEntryGeneric {
 
 struct MadtEntryIter {
     ptr: Option<NonNull<MadtEntryGeneric>>,
-    end_ptr: VAddr,
+    end_ptr: VirtualAddress,
 }
 
 impl MadtEntryIter {
@@ -32,7 +32,7 @@ impl MadtEntryIter {
                 NonNull::new((madt_ptr as *const u8).add(core::mem::size_of::<Madt>())
                     as *mut MadtEntryGeneric)
             },
-            end_ptr: VAddr::from_ptr(unsafe {
+            end_ptr: VirtualAddress::from_ptr(unsafe {
                 (madt_ptr as *const u8).add((*madt_ptr).header.length as usize)
             }),
         }
@@ -45,7 +45,7 @@ impl Iterator for MadtEntryIter {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(nn_ptr) = self.ptr {
             let entry_length = unsafe { nn_ptr.read() }.entry_length;
-            if VAddr::from_ptr(unsafe { nn_ptr.as_ptr().add(entry_length as usize) }) > self.end_ptr
+            if VirtualAddress::from_ptr(unsafe { nn_ptr.as_ptr().add(entry_length as usize) }) > self.end_ptr
             {
                 self.ptr = None;
             } else {

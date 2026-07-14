@@ -1,12 +1,12 @@
 use core::ops::Add;
 
 pub use crate::cpu::isa::interface::io::{IReg64Ifce, OReg64Ifce};
-use crate::memory::PAddr;
-use crate::memory::physical::PhysicalAddress;
+use crate::memory::PhysicalAddress;
+use crate::memory::physical::PhysicalAddressIfce;
 
 #[derive(Copy, Clone, Debug)]
 pub enum IoReg64 {
-    Mmio(PAddr),
+    Mmio(PhysicalAddress),
 }
 
 impl IReg64Ifce for IoReg64 {

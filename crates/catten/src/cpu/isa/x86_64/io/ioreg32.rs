@@ -2,15 +2,15 @@ use core::arch::asm;
 use core::ops::Add;
 
 pub use crate::cpu::isa::interface::io::{IReg32Ifce, OReg32Ifce};
-use crate::memory::PAddr;
-use crate::memory::physical::PhysicalAddress;
+use crate::memory::PhysicalAddress;
+use crate::memory::physical::PhysicalAddressIfce;
 
 #[derive(Copy, Clone, Debug)]
 pub enum IoReg32 {
     IoPort(u16),
-    Mmio(PAddr),
+    Mmio(PhysicalAddress),
     PcieCfg {
-        ecam_base: PAddr,
+        ecam_base: PhysicalAddress,
         bus: u8,
         device: u8,
         function: u8,

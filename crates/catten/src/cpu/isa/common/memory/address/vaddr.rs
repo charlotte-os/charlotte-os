@@ -10,18 +10,18 @@ use core::{
 use crate::cpu::isa::{
     interface::memory::address::{
         Address,
-        VirtualAddress,
+        VirtualAddressIfce,
     },
     memory::address::VADDR_SIG_BITS,
 };
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct VAddr {
+pub struct VirtualAddress {
     raw: usize,
 }
 
-impl core::fmt::Debug for VAddr {
+impl core::fmt::Debug for VirtualAddress {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "VAddr({:#x})", self.raw)
     }
@@ -39,7 +39,7 @@ const PT_INDEX_SHIFT: usize = 12;
 const PT_INDEX_MASK: usize = PAGE_TABLE_INDEX_MASK << PT_INDEX_SHIFT;
 const OFFSET_MASK: usize = 0xfff;
 
-impl VAddr {
+impl VirtualAddress {
     /// Convenience functions to get the index for each level of the page table hierarchy
 
     pub fn pml4_index(&self) -> usize {
@@ -64,20 +64,20 @@ impl VAddr {
 
     /// Safety: The address must be valid and in canonical form
     pub const unsafe fn from_raw_unchecked(raw: usize) -> Self {
-        VAddr {
+        VirtualAddress {
             raw,
         }
     }
 }
 
-impl Address for VAddr {
-    const MAX: Self = VAddr {
+impl Address for VirtualAddress {
+    const MAX: Self = VirtualAddress {
         raw: usize::MAX,
     };
-    const MIN: Self = VAddr {
+    const MIN: Self = VirtualAddress {
         raw: 0,
     };
-    const NULL: Self = VAddr {
+    const NULL: Self = VirtualAddress {
         raw: 0,
     };
 
@@ -87,12 +87,12 @@ impl Address for VAddr {
 
     fn next_aligned_to(&self, alignment: usize) -> Self {
         let mask = alignment - 1;
-        let aligned = (<VAddr as Into<usize>>::into(*self) + mask) & !mask;
-        VAddr::from(aligned)
+        let aligned = (<VirtualAddress as Into<usize>>::into(*self) + mask) & !mask;
+        VirtualAddress::from(aligned)
     }
 
     fn prev_aligned_to(&self, alignment: usize) -> Self {
-        VAddr {
+        VirtualAddress {
             raw: if alignment % 2 == 0 {
                 self.raw & !(alignment - 1)
             } else {
@@ -110,21 +110,21 @@ impl Address for VAddr {
     }
 
     unsafe fn from_unchecked(addr: usize) -> Self {
-        VAddr {
+        VirtualAddress {
             raw: addr,
         }
     }
 }
 
-impl VirtualAddress for VAddr {
+impl VirtualAddressIfce for VirtualAddress {
     fn from_ptr<T>(ptr: *const T) -> Self {
-        VAddr {
+        VirtualAddress {
             raw: ptr as usize,
         }
     }
 
     fn from_mut<T>(ptr: *mut T) -> Self {
-        VAddr {
+        VirtualAddress {
             raw: ptr as usize,
         }
     }
@@ -138,7 +138,7 @@ impl VirtualAddress for VAddr {
     }
 }
 
-impl From<usize> for VAddr {
+impl From<usize> for VirtualAddress {
     fn from(value: usize) -> Self {
         let mask = (1 << *VADDR_SIG_BITS) - 1;
         let sign_extended = if value & (1 << (*VADDR_SIG_BITS - 1)) != 0 {
@@ -146,30 +146,30 @@ impl From<usize> for VAddr {
         } else {
             value & mask
         };
-        VAddr {
+        VirtualAddress {
             raw: sign_extended,
         }
     }
 }
 
-impl Into<usize> for VAddr {
+impl Into<usize> for VirtualAddress {
     fn into(self) -> usize {
         self.raw
     }
 }
 
-impl From<u64> for VAddr {
+impl From<u64> for VirtualAddress {
     fn from(value: u64) -> Self {
-        VAddr::from(value as usize)
+        VirtualAddress::from(value as usize)
     }
 }
-impl Into<u64> for VAddr {
+impl Into<u64> for VirtualAddress {
     fn into(self) -> u64 {
         self.raw as u64
     }
 }
 
-impl Sub for VAddr {
+impl Sub for VirtualAddress {
     type Output = isize;
 
     fn sub(self, other: Self) -> Self::Output {
@@ -177,50 +177,50 @@ impl Sub for VAddr {
     }
 }
 
-impl Add<isize> for VAddr {
-    type Output = VAddr;
+impl Add<isize> for VirtualAddress {
+    type Output = VirtualAddress;
 
     fn add(self, other: isize) -> Self::Output {
-        VAddr {
+        VirtualAddress {
             raw: (self.raw as isize + other) as usize,
         }
     }
 }
 
-impl Sub<isize> for VAddr {
-    type Output = VAddr;
+impl Sub<isize> for VirtualAddress {
+    type Output = VirtualAddress;
 
     fn sub(self, other: isize) -> Self::Output {
-        VAddr::from(self.raw - other as usize)
+        VirtualAddress::from(self.raw - other as usize)
     }
 }
 
-impl Add<usize> for VAddr {
-    type Output = VAddr;
+impl Add<usize> for VirtualAddress {
+    type Output = VirtualAddress;
 
     fn add(self, other: usize) -> Self::Output {
-        VAddr::from(self.raw + other)
+        VirtualAddress::from(self.raw + other)
     }
 }
 
-impl Sub<usize> for VAddr {
-    type Output = VAddr;
+impl Sub<usize> for VirtualAddress {
+    type Output = VirtualAddress;
 
     fn sub(self, other: usize) -> Self::Output {
-        VAddr::from(self.raw - other)
+        VirtualAddress::from(self.raw - other)
     }
 }
 
-impl<T> AddAssign<T> for VAddr
+impl<T> AddAssign<T> for VirtualAddress
 where
-    VAddr: Add<T, Output = VAddr>,
+    VirtualAddress: Add<T, Output = VirtualAddress>,
 {
     fn add_assign(&mut self, rhs: T) {
         *self = *self + rhs;
     }
 }
 
-impl Step for VAddr {
+impl Step for VirtualAddress {
     fn steps_between(start: &Self, end: &Self) -> (usize, Option<usize>) {
         if start > end {
             (0, None)
@@ -231,7 +231,7 @@ impl Step for VAddr {
 
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
         if start.raw.saturating_add(count) < usize::MAX {
-            Some(VAddr {
+            Some(VirtualAddress {
                 raw: start.raw + count,
             })
         } else {
@@ -241,7 +241,7 @@ impl Step for VAddr {
 
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
         if start.raw.saturating_sub(count) > usize::MIN {
-            Some(VAddr {
+            Some(VirtualAddress {
                 raw: start.raw - count,
             })
         } else {
@@ -252,7 +252,7 @@ impl Step for VAddr {
     fn forward_overflowing(start: Self, count: usize) -> (Self, bool) {
         let (new_raw, overflow) = start.raw.overflowing_add(count);
         (
-            VAddr {
+            VirtualAddress {
                 raw: new_raw,
             },
             overflow,
@@ -262,7 +262,7 @@ impl Step for VAddr {
     fn backward_overflowing(start: Self, count: usize) -> (Self, bool) {
         let (new_raw, overflow) = start.raw.overflowing_sub(count);
         (
-            VAddr {
+            VirtualAddress {
                 raw: new_raw,
             },
             overflow,
@@ -270,9 +270,9 @@ impl Step for VAddr {
     }
 }
 
-impl Default for VAddr {
+impl Default for VirtualAddress {
     fn default() -> Self {
-        VAddr {
+        VirtualAddress {
             raw: 0,
         }
     }

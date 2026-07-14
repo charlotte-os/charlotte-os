@@ -3,9 +3,13 @@ pub mod paging;
 pub mod tlb;
 
 pub use crate::cpu::isa::interface::memory::MemoryInterface;
-use crate::cpu::isa::memory::address::paddr::PAddrError;
-use crate::memory::linear::Error as VMemError;
-use crate::memory::physical::Error as PMemError;
+use crate::{
+    cpu::isa::memory::address::paddr::PhysicalAddressError,
+    memory::{
+        linear::Error as VMemError,
+        physical::Error as PMemError,
+    },
+};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
@@ -26,8 +30,8 @@ impl From<PMemError> for Error {
     }
 }
 
-impl From<PAddrError> for Error {
-    fn from(err: PAddrError) -> Self {
+impl From<PhysicalAddressError> for Error {
+    fn from(err: PhysicalAddressError) -> Self {
         Error::PMemError(PMemError::PAddrError(err))
     }
 }
@@ -42,8 +46,8 @@ pub struct MemoryInterfaceImpl;
 impl MemoryInterface for MemoryInterfaceImpl {
     type AddressSpace = paging::AddressSpace;
     type Error = Error;
-    type PAddr = address::paddr::PAddr;
-    type VAddr = address::vaddr::VAddr;
+    type PAddr = address::paddr::PhysicalAddress;
+    type VAddr = address::vaddr::VirtualAddress;
 
     const PAGE_SIZE: usize = paging::PAGE_SIZE;
 }

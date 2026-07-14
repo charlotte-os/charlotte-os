@@ -2,15 +2,15 @@ use core::arch::asm;
 use core::ops::Add;
 
 pub use crate::cpu::isa::interface::io::{IReg8Ifce, OReg8Ifce};
-use crate::cpu::isa::interface::memory::address::VirtualAddress;
-use crate::memory::physical::PhysicalAddress;
-use crate::memory::{PAddr, VAddr};
+use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
+use crate::memory::physical::PhysicalAddressIfce;
+use crate::memory::{PhysicalAddress, VirtualAddress};
 
 #[derive(Copy, Clone, Debug)]
 pub enum IoReg8 {
     IoPort(u16),
-    HhdmMmio(PAddr),
-    MappedMmio(VAddr),
+    HhdmMmio(PhysicalAddress),
+    MappedMmio(VirtualAddress),
 }
 
 impl IReg8Ifce for IoReg8 {

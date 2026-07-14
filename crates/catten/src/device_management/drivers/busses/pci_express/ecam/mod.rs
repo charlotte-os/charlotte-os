@@ -4,16 +4,29 @@ pub mod capabilities;
 pub mod headers;
 pub mod pcie;
 
-use crate::klib::size::mebibytes;
-use crate::logln;
-use crate::memory::allocators::memory::PageSize;
-use crate::memory::linear::MemoryMapping;
-use crate::memory::linear::address_map::{LA_MAP, LinearMemoryRegion, RegionType};
-use crate::memory::{AddressSpaceInterface, KERNEL_AS, PAddr, VAddr};
+use crate::{
+    klib::size::mebibytes,
+    logln,
+    memory::{
+        AddressSpaceInterface,
+        KERNEL_AS,
+        PhysicalAddress,
+        VirtualAddress,
+        allocators::memory::PageSize,
+        linear::{
+            MemoryMapping,
+            address_map::{
+                LA_MAP,
+                LinearMemoryRegion,
+                RegionType,
+            },
+        },
+    },
+};
 
 const ECAM_SIZE: usize = mebibytes(256); /* Each PCIe segment group's ECAM occupies 256 MiB of address space */
 
-pub(super) fn map_ecam(base: PAddr) -> VAddr {
+pub(super) fn map_ecam(base: PhysicalAddress) -> VirtualAddress {
     logln!("[drivers::busses::pci_express] Mapping PCIe ECAM at physical address {:?}", base);
     let mut kas = KERNEL_AS.lock();
     logln!(
@@ -24,7 +37,7 @@ pub(super) fn map_ecam(base: PAddr) -> VAddr {
     let vbase = kas
         .find_free_region_large_aligned(
             ECAM_SIZE / PageSize::Large.num_bytes(),
-            <LinearMemoryRegion as Into<(VAddr, VAddr)>>::into(
+            <LinearMemoryRegion as Into<(VirtualAddress, VirtualAddress)>>::into(
                 *LA_MAP.get_region(RegionType::KernelMmio),
             ),
         )

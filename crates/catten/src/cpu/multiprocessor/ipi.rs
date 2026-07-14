@@ -20,7 +20,7 @@ use crate::cpu::isa::memory::tlb;
 use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
-use crate::memory::linear::VAddr;
+use crate::memory::linear::VirtualAddress;
 use crate::memory::{AddressSpaceId, KERNEL_ASID};
 
 pub static IPI_CMD_QUEUES: spin::LazyLock<IpiCmdQueues> = spin::LazyLock::new(IpiCmdQueues::new);
@@ -54,7 +54,7 @@ impl IpiCmdQueues {
 
 #[derive(Debug)]
 pub enum IpiRpc {
-    VMemInval(AddressSpaceId, VAddr, usize),
+    VMemInval(AddressSpaceId, VirtualAddress, usize),
     AsidInval(AddressSpaceId),
     Wakeup,
 }

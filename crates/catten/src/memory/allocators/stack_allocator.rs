@@ -19,11 +19,11 @@ use super::memory;
 use crate::cpu::isa::memory::{MemoryInterface, MemoryInterfaceImpl};
 use crate::logln;
 use crate::memory::allocators::memory::PageSize;
-use crate::memory::linear::VAddr;
+use crate::memory::linear::VirtualAddress;
 use crate::memory::linear::address_map::LA_MAP;
 use crate::memory::{AddressSpaceInterface, KERNEL_AS};
 
-static KERNEL_GUARD_PAGE_SET: LazyLock<RwLock<BTreeSet<VAddr>>> =
+static KERNEL_GUARD_PAGE_SET: LazyLock<RwLock<BTreeSet<VirtualAddress>>> =
     LazyLock::new(|| RwLock::new(BTreeSet::new()));
 #[derive(Debug)]
 pub enum Error {
@@ -49,7 +49,7 @@ impl From<memory::Error> for Error {
 /// The address returned by this function is the base address of the stack and it is
 /// aligned to the page size and suitable for placing directly into the stack pointer register.
 /// This is guaranteed to be the case under all supported architectures.
-pub fn allocate_stack(n_pages: usize) -> Result<VAddr, Error> {
+pub fn allocate_stack(n_pages: usize) -> Result<VirtualAddress, Error> {
     const NUM_GUARD_PAGES: usize = 2;
     // find a suitable range in the kernel stack arena
     let stack_region_base = KERNEL_AS.lock().find_free_region(
@@ -66,7 +66,7 @@ pub fn allocate_stack(n_pages: usize) -> Result<VAddr, Error> {
 }
 
 /// Deallocate a kernel stack previously allocated by `allocate_stack`.
-pub fn deallocate_stack(stack_end: VAddr) -> Result<(), Error> {
+pub fn deallocate_stack(stack_end: VirtualAddress) -> Result<(), Error> {
     let n_pages = validate_stack(stack_end)?;
     memory::unmap_and_deallocate_range(
         stack_end - PageSize::Standard.num_bytes() * (n_pages + 1),
@@ -76,7 +76,7 @@ pub fn deallocate_stack(stack_end: VAddr) -> Result<(), Error> {
     Ok(())
 }
 
-fn validate_stack(stack_end: VAddr) -> Result<usize, Error> {
+fn validate_stack(stack_end: VirtualAddress) -> Result<usize, Error> {
     let stack_buf_base = stack_end - PageSize::Standard.num_bytes();
     let guard_set = KERNEL_GUARD_PAGE_SET.read();
     if guard_set.contains(&stack_buf_base) {

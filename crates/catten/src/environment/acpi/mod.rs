@@ -43,19 +43,19 @@ use spin::LazyLock;
 use crate::cpu::isa::interface::memory::address::Address;
 use crate::environment::boot_protocol::limine::RSDP_REQUEST;
 use crate::logln;
-use crate::memory::PAddr;
-use crate::memory::physical::PhysicalAddress;
+use crate::memory::PhysicalAddress;
+use crate::memory::physical::PhysicalAddressIfce;
 
 pub mod aml;
 pub mod sdt;
 
-static TABLE_MAP: LazyLock<HashMap<AcpiTableType, Vec<PAddr>>> = LazyLock::new(|| {
+static TABLE_MAP: LazyLock<HashMap<AcpiTableType, Vec<PhysicalAddress>>> = LazyLock::new(|| {
     if let Some(xsdp_ptr) = get_xsdp() {
         let xsdp: &Xsdp = unsafe { xsdp_ptr.as_ref() };
         if !xsdp.validate() {
             panic!("Invalid ACPI Extended System Description Pointer (XSDP)");
         }
-        let xsdt_addr = PAddr::from(xsdp.xsdt_address);
+        let xsdt_addr = PhysicalAddress::from(xsdp.xsdt_address);
         if xsdt_addr.is_null() {
             panic!("ACPI Extended System Description Table (XSDT) required but not found");
         }
@@ -253,7 +253,7 @@ pub fn is_acpi_available() -> bool {
     get_xsdp().is_some()
 }
 
-pub fn find_table_type(table: AcpiTableType) -> Result<Vec<PAddr>, Error> {
+pub fn find_table_type(table: AcpiTableType) -> Result<Vec<PhysicalAddress>, Error> {
     if let Some(table_addrs) = TABLE_MAP.get(&table) {
         Ok(table_addrs.clone())
     } else {
@@ -261,7 +261,7 @@ pub fn find_table_type(table: AcpiTableType) -> Result<Vec<PAddr>, Error> {
     }
 }
 
-fn parse_xsdt(xsdt_addr: PAddr) -> HashMap<AcpiTableType, Vec<PAddr>> {
+fn parse_xsdt(xsdt_addr: PhysicalAddress) -> HashMap<AcpiTableType, Vec<PhysicalAddress>> {
     let mut tables = HashMap::new();
     logln!("[ACPI] Parsing XSDT at address {:?}", xsdt_addr);
     let xsdt_header: &SdtHeader =
@@ -287,10 +287,10 @@ fn parse_xsdt(xsdt_addr: PAddr) -> HashMap<AcpiTableType, Vec<PAddr>> {
         xsdt_data_ptr,
         num_entries
     );
-    let mut table_addrs = Vec::<PAddr>::with_capacity(num_entries);
+    let mut table_addrs = Vec::<PhysicalAddress>::with_capacity(num_entries);
     for i in 0..num_entries {
         let entry_addr = unsafe { xsdt_data_ptr.as_ptr().add(i).read_unaligned() };
-        table_addrs.push(PAddr::from(entry_addr));
+        table_addrs.push(PhysicalAddress::from(entry_addr));
     }
 
     for table_addr in &table_addrs {
@@ -310,7 +310,7 @@ fn parse_xsdt(xsdt_addr: PAddr) -> HashMap<AcpiTableType, Vec<PAddr>> {
     tables
 }
 
-fn get_table_signature(table_addr: PAddr) -> Option<[u8; 4]> {
+fn get_table_signature(table_addr: PhysicalAddress) -> Option<[u8; 4]> {
     if table_addr.is_null() {
         return None;
     } else {
