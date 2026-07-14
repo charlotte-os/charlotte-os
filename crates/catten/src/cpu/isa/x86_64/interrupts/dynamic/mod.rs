@@ -68,20 +68,19 @@ impl Default for DynInterruptDispatcher {
 }
 
 impl DynInterruptDispatcherIfce for DynInterruptDispatcher {
-    #[unsafe(no_mangle)]
-    extern "C" fn set_dyn_ih(
+    fn set_dyn_ih(
         &self,
         lp: LpId,
         vector: InterruptSourceDiscriminator,
         handler: InterruptHandler,
-    ) -> core::ffi::c_int {
+    ) -> Result<(), Error> {
         if let Ok(dyn_vec_num) = DynamicInterruptVectorNum::try_from(vector) {
             let mut table = unsafe { self.matrix.get_nonlocal_mut(lp) };
             let index = <DynamicInterruptVectorNum as Into<usize>>::into(dyn_vec_num);
             table[index] = Some(handler);
-            0
+            Ok(())
         } else {
-            -1
+            Err(Error::InvalidDynamicVectorNumber(vector))
         }
     }
 

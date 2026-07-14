@@ -15,10 +15,13 @@ use hashbrown::HashMap;
 
 use crate::{
     cpu::isa::{
+        self,
         constants::interrupt_vectors::{
             DYN_VEC_START_OFFSET,
             DYN_VECS_PER_LP,
         },
+        interface::interrupts::DynInterruptDispatcherIfce,
+        interrupts::dynamic::DYN_IH_MATRIX,
         lp::{
             EicId,
             EicPinNum,
@@ -38,6 +41,13 @@ pub enum Error {
     InterruptVectorsExhausted,
     InterruptRedirectionTableFull,
     PcieError(pci_express::Error),
+    IsaInterruptsError(isa::interrupts::Error),
+}
+
+impl From<isa::interrupts::Error> for Error {
+    fn from(err: isa::interrupts::Error) -> Self {
+        Error::IsaInterruptsError(err)
+    }
 }
 
 /// External Interrupt Controller input source
@@ -92,10 +102,27 @@ impl InterruptRoutingManager {
         input: InterruptInput,
         handler: InterruptHandler,
     ) -> Result<InterruptTarget, Error> {
+        /* Find the least loaded logical processor and a free dynamic interrupt discriminator
+         * value on it */
         let target_lp = self.least_loaded_lp();
         let vector = self.find_free_vector(target_lp).ok_or(Error::InterruptVectorsExhausted)?;
+        /* Set the dynamic interrupt handler for the chosen logical processor and vector and
+         * record the mapping in the routing table */
+        DYN_IH_MATRIX.set_dyn_ih(target_lp, vector, handler)?;
+        self.routes.entry(target_lp).or_default().insert(vector, input);
+        /* Map the route on the inbound interrupt signal routing mechanism */
+        let target = InterruptTarget {
+            lp_id: target_lp,
+            discriminator: vector,
+        };
 
-        todo!("Register the handler with the appropriate LP and route the interrupt source to it.")
+        todo!("Implement IOMMU interrupt redirection.");
+
+        /* TODO: Implement routing for all possible interrupt signal routing mechanisms to the
+        created IOMMU redirection entry. */
+        input.route(&target)?;
+
+        Ok(target)
     }
 
     fn least_loaded_lp(&self) -> LpId {

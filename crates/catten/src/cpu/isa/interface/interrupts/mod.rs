@@ -12,13 +12,12 @@ use crate::cpu::{
 /// Dynamic Interrupt Dispatcher Interface
 pub trait DynInterruptDispatcherIfce {
     /// Set the interrupt handler for a given logical processor and vector
-    /// Note: must be #[unsafe(no_mangle)] and extern "C" to be callable from assembly code
-    extern "C" fn set_dyn_ih(
+    fn set_dyn_ih(
         &self,
         lp: LpId,
         vector: InterruptSourceDiscriminator,
         handler: InterruptHandler,
-    ) -> core::ffi::c_int;
+    ) -> Result<(), Error>;
     /// Get the interrupt handler for a given vector
     /// Note: must be #[unsafe(no_mangle)] and extern "C" to be callable from assembly code
     extern "C" fn get_dyn_ih(
