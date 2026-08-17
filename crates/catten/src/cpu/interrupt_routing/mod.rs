@@ -120,7 +120,7 @@ impl InterruptRoutingManager {
 
         /* TODO: Implement routing for all possible interrupt signal routing mechanisms to the
         created IOMMU redirection entry. */
-        input.route(&target)?;
+        //input.route(&target)?;
 
         Ok(target)
     }
