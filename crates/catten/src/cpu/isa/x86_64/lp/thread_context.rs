@@ -1,25 +1,48 @@
-use core::mem::{offset_of, transmute};
+use core::mem::{
+    offset_of,
+    transmute,
+};
 
 const INIT_KERNEL_STACK_PAGES: usize = 16;
 
-use crate::cpu::isa::init::gdt::{USER_CODE_SELECTOR, USER_DATA_SELECTOR};
-use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
-use crate::cpu::isa::lp::ops::{kernel_thread_trampoline, user_trampoline};
-use crate::cpu::isa::memory::paging::PAGE_SIZE;
-use crate::klib::collections::id_table;
-use crate::memory::allocators::stack_allocator::{allocate_stack, deallocate_stack};
-use crate::memory::{ADDRESS_SPACE_TABLE, AddressSpaceId, KERNEL_AS, VirtualAddress};
+use crate::{
+    cpu::isa::{
+        init::gdt::{
+            USER_CODE_SELECTOR,
+            USER_DATA_SELECTOR,
+        },
+        interface::memory::address::VirtualAddressIfce,
+        lp::ops::{
+            kernel_thread_trampoline,
+            user_trampoline,
+        },
+        memory::paging::PAGE_SIZE,
+    },
+    klib::collections::id_table,
+    memory::{
+        ADDRESS_SPACE_TABLE,
+        AddressSpaceId,
+        KERNEL_AS,
+        VirtualAddress,
+        allocators::stack_allocator::{
+            allocate_stack,
+            deallocate_stack,
+        },
+    },
+};
 
-/// # Interrupt stack frame structure for x86_64 architecture
+/// `iretq` stack frame structure for x86_64 architecture to be used with `switch_ctx` and then
+/// return to the userspace entry thunk to properly enter userspace at the entry point.
 /// Note: must be 16 byte aligned as per `AMD APM 8.9.3`
 #[repr(C, align(16))]
 struct UserEntryFrames {
     // yield_lp return frame
     cr3: u64,
-    rflags_cpl0: u64,
-    rip0: u64,
+    rflags_pl0: u64,
+    callee_saved_regs: [u64; 6],
+    rip_pl0: u64,
     // iretq return frame
-    rip: u64,
+    rip_pl3: u64,
     cs: u64,
     rflags: u64,
     rsp: u64,
@@ -33,13 +56,14 @@ impl UserEntryFrames {
                 .get(asp)
                 .expect("Address space not found when creating thread context.")
                 .get_cr3(),
-            rflags_cpl0: 0x2,
-            rip0: unsafe {
+            rflags_pl0: 0x2,
+            callee_saved_regs: [0; 6],
+            rip_pl0: unsafe {
                 transmute::<*const unsafe extern "C" fn() -> !, u64>(
                     user_trampoline as *const unsafe extern "C" fn() -> !,
                 )
             },
-            rip: entry_point,
+            rip_pl3: entry_point,
             cs: USER_CODE_SELECTOR as u64,
             rflags: flags,
             rsp: <VirtualAddress as Into<u64>>::into(iretq_rsp),
@@ -57,6 +81,10 @@ impl UserEntryFrames {
     }
 }
 
+/// # Kernel entry frame structure for x86_64 architecture
+/// This is a simple frame to be used with the context loading half of `switch_ctx`.
+/// It is an ordinary stack frame used with `pop` and `ret` since we don't need to change privilege
+/// levels which would require either `iretq` or `sysret`.
 #[repr(C, align(16))]
 struct KernelEntryFrame {
     cr3: u64,
@@ -110,15 +138,10 @@ impl From<id_table::Error> for Error {
 pub struct ThreadContext {
     pub rsp_cpl0: u64,
     _kernel_stack_buf: VirtualAddress,
-    _user_stack_buf: Option<VirtualAddress>,
 }
 
 impl Drop for ThreadContext {
     fn drop(&mut self) {
-        if let Some(user_stack_buf) = self._user_stack_buf {
-            deallocate_stack(user_stack_buf)
-                .expect("Failed to deallocate user stack for thread context.");
-        }
         deallocate_stack(self._kernel_stack_buf)
             .expect("Failed to deallocate kernel stack for thread context.");
     }
@@ -141,7 +164,6 @@ impl ThreadContext {
         Ok(ThreadContext {
             rsp_cpl0: <VirtualAddress as Into<u64>>::into(kernel_stack_top),
             _kernel_stack_buf: VirtualAddress::default(),
-            _user_stack_buf: Some(user_stack_buf),
         })
     }
 
@@ -154,7 +176,6 @@ impl ThreadContext {
         Ok(ThreadContext {
             rsp_cpl0: <VirtualAddress as Into<u64>>::into(kernel_stack_top),
             _kernel_stack_buf: kernel_stack_buf,
-            _user_stack_buf: None,
         })
     }
 }
