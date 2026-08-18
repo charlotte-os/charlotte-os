@@ -43,7 +43,7 @@ pub fn get_int_state() -> bool {
             options(nomem, nostack, preserves_flags)
         );
     }
-    rflags & (1 << rflags::IF_SHIFT) != 0
+    rflags & (1 << rflags::INTERRUPT_FLAG_SHIFT) != 0
 }
 
 #[rustfmt::skip]
@@ -85,7 +85,10 @@ pub fn get_lic_id() -> u32 {
     apic_id
 }
 
-use core::arch::{asm, naked_asm};
+use core::arch::{
+    asm,
+    naked_asm,
+};
 
 use super::LpId;
 use crate::cpu::isa::constants::*;
@@ -117,10 +120,14 @@ pub fn get_lp_id() -> LpId {
     id as crate::cpu::isa::lp::LpId
 }
 
-use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
-use crate::cpu::scheduler::threads::MASTER_THREAD_TABLE;
-use crate::logln;
-use crate::memory::VirtualAddress;
+use crate::{
+    cpu::scheduler::{
+        system_scheduler::SYSTEM_SCHEDULER,
+        threads::MASTER_THREAD_TABLE,
+    },
+    logln,
+    memory::VirtualAddress,
+};
 
 #[inline]
 pub extern "C" fn get_lp_local_base() -> VirtualAddress {
@@ -163,7 +170,7 @@ pub extern "C" fn cond_yield_lp() {
             lp_id: LpId,
         },
         FromNonThread {
-            next:  usize,
+            next: usize,
             lp_id: LpId,
         },
     }
@@ -209,7 +216,6 @@ pub extern "C" fn cond_yield_lp() {
                     } else {
                         cfg_select! {
                             feature = "yield_trace" => {
-
                                 trace = YieldTrace::NoSwitch {
                                     lp_id: get_lp_id(),
                                 };
@@ -229,7 +235,7 @@ pub extern "C" fn cond_yield_lp() {
                     cfg_select! {
                         feature = "yield_trace" => {
                             trace = YieldTrace::FromNonThread {
-                                next:  next_tid,
+                                next: next_tid,
                                 lp_id: get_lp_id(),
                             };
                         }
@@ -354,6 +360,11 @@ pub unsafe extern "C" fn user_trampoline() -> ! {
     // properly set up with a `UserEntryFrames` struct, and that the CPU is in the correct state for
     // executing this trampoline (e.g., interrupts disabled, correct segment selectors, etc.).
     naked_asm!(
+        // Set the current stack pointer as the one to use for the kernel stack in the TSS
+        "mov rdi, rsp",
+        "call update_tss_rsp0",
+        // Switch to the userspace value for GS.BASE, saving the kernel value in the MSR
+        "swapgs",
         // `iretq` to the user entry point
         "iretq",
     );

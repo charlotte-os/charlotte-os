@@ -1,5 +1,7 @@
-use core::arch::asm;
-use core::mem::size_of;
+use core::{
+    arch::asm,
+    mem::size_of,
+};
 
 use crate::get_lp_id;
 
@@ -30,14 +32,14 @@ impl SegmentDescriptor {
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed(1))]
 struct TssDescriptor {
-    low:  u64, // Low 64 bits of the descriptor
+    low: u64,  // Low 64 bits of the descriptor
     high: u64, // High 64 bits of the descriptor
 }
 
 impl TssDescriptor {
     fn new() -> Self {
         TssDescriptor {
-            low:  0,
+            low: 0,
             high: 0,
         }
     }
@@ -148,14 +150,14 @@ unsafe extern "C" {
 #[repr(C, packed(1))]
 struct GdtRegister {
     limit: u16,
-    base:  *const Gdt,
+    base: *const Gdt,
 }
 
 impl GdtRegister {
     fn new(gdt: &Gdt) -> Self {
         GdtRegister {
             limit: (size_of::<Gdt>() - 1) as u16,
-            base:  gdt,
+            base: gdt,
         }
     }
 
@@ -235,11 +237,11 @@ impl Tss {
     pub fn new(rsp0: u64, ist1: u64) -> Self {
         Tss {
             res0: 0,
-            rsp0: rsp0,
+            rsp0: rsp0, // Kernel stack pointer for user threads
             rsp1: 0,
             rsp2: 0,
             res1: 0,
-            ist1: ist1,
+            ist1: ist1, // First IST entry used for double fault exceptions
             ist2: 0,
             ist3: 0,
             ist4: 0,
@@ -263,7 +265,8 @@ unsafe fn get_tss() -> *mut Tss {
     }
 }
 
-pub extern "C" fn write_rsp0(val: u64) {
+#[unsafe(no_mangle)]
+pub extern "C" fn update_tss_rsp0(val: u64) {
     unsafe {
         let tss = get_tss();
         (*tss).rsp0 = val;

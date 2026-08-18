@@ -7,11 +7,15 @@ const INIT_KERNEL_STACK_PAGES: usize = 16;
 
 use crate::{
     cpu::isa::{
+        constants::rflags,
         init::gdt::{
             USER_CODE_SELECTOR,
             USER_DATA_SELECTOR,
         },
-        interface::memory::address::VirtualAddressIfce,
+        interface::memory::address::{
+            Address,
+            VirtualAddressIfce,
+        },
         lp::ops::{
             kernel_thread_trampoline,
             user_trampoline,
@@ -50,7 +54,7 @@ struct UserEntryFrames {
 }
 
 impl UserEntryFrames {
-    fn new(asp: AddressSpaceId, entry_point: u64, iretq_rsp: VirtualAddress, flags: u64) -> Self {
+    fn new(asp: AddressSpaceId, entry_point: u64, flags: u64) -> Self {
         UserEntryFrames {
             cr3: ADDRESS_SPACE_TABLE
                 .get(asp)
@@ -66,7 +70,7 @@ impl UserEntryFrames {
             rip_pl3: entry_point,
             cs: USER_CODE_SELECTOR as u64,
             rflags: flags,
-            rsp: <VirtualAddress as Into<u64>>::into(iretq_rsp),
+            rsp: VirtualAddress::NULL.into(),
             ss: USER_DATA_SELECTOR as u64,
         }
     }
@@ -152,11 +156,8 @@ impl ThreadContext {
         asid: AddressSpaceId,
         entry_point: extern "C" fn(),
     ) -> Result<Self, Error> {
-        let flags: u64 = 0x202;
-        let user_stack_buf = allocate_stack(INIT_KERNEL_STACK_PAGES)
-            .expect("Failed to allocate user stack for thread context.");
-        let user_stack_top = user_stack_buf + INIT_KERNEL_STACK_PAGES * PAGE_SIZE;
-        let isf = UserEntryFrames::new(asid, entry_point as u64, user_stack_top, flags);
+        let flags: u64 = rflags::DEFAULT_FLAGS;
+        let isf = UserEntryFrames::new(asid, entry_point as u64, flags);
         let kernel_stack_buf = allocate_stack(INIT_KERNEL_STACK_PAGES)
             .expect("Failed to allocate kernel stack for thread context.");
         let mut kernel_stack_top = kernel_stack_buf + INIT_KERNEL_STACK_PAGES * PAGE_SIZE;
