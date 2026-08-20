@@ -60,7 +60,7 @@ impl UserEntryFrames {
                 .get(asp)
                 .expect("Address space not found when creating thread context.")
                 .get_cr3(),
-            rflags_pl0: 0x2,
+            rflags_pl0: rflags::DEFAULT_FLAGS,
             callee_saved_regs: [0; 6],
             rip_pl0: unsafe {
                 transmute::<*const unsafe extern "C" fn() -> !, u64>(
@@ -103,7 +103,7 @@ impl KernelEntryFrame {
         callee_saved_regs[3] = entry_point;
         KernelEntryFrame {
             cr3,
-            rflags: 0x2,
+            rflags: rflags::DEFAULT_FLAGS,
             callee_saved_regs,
             rip: kernel_thread_trampoline as *const () as u64,
         }
