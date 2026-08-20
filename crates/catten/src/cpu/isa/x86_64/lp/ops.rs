@@ -179,7 +179,7 @@ pub extern "C" fn cond_yield_lp() {
     // Collect switch parameters and release all locks before calling switch_ctx.
     // switch_ctx may permanently abandon the current stack (initial non-thread switch),
     // so any guards held across it would never be dropped, leaving locks permanently locked.
-    let switch_params: Option<(*mut u64, *const u64)> = {
+    let switch_params: Option<(*mut VirtualAddress, *const VirtualAddress)> = {
         let sched = SYSTEM_SCHEDULER.read();
         let mut lsched = sched.get_lp_scheduler().lock();
         if lsched.is_ctx_switch_pending() {
@@ -194,11 +194,13 @@ pub extern "C" fn cond_yield_lp() {
                                     curr_tid.expect("Current thread ID not found during yield."),
                                 )
                                 .expect("Current thread not found during yield.");
-                            let curr_rsp0_ptr = &raw mut curr_thread.context.rsp_cpl0;
+                            let curr_rsp0_ptr =
+                                &raw mut curr_thread.context.kernel_stack_buf.curr_sp;
                             let next_thread = tt_guard
                                 .get_mut(next_tid)
                                 .expect("Next thread not found during yield.");
-                            let next_rsp0_ptr = &raw mut next_thread.context.rsp_cpl0;
+                            let next_rsp0_ptr =
+                                &raw mut next_thread.context.kernel_stack_buf.curr_sp;
                             (curr_rsp0_ptr, next_rsp0_ptr)
                         };
                         cfg_select! {
@@ -230,7 +232,7 @@ pub extern "C" fn cond_yield_lp() {
                         let next_thread = tt_guard
                             .get_mut(next_tid)
                             .expect("Next thread not found during yield.");
-                        &raw mut next_thread.context.rsp_cpl0
+                        &raw mut next_thread.context.kernel_stack_buf.curr_sp
                     };
                     cfg_select! {
                         feature = "yield_trace" => {
@@ -278,7 +280,7 @@ pub extern "C" fn cond_yield_lp() {
         } => logln!("Yielding from non-thread context to thread {:?} on LP {:?}", next, lp_id),
     }
     if let Some((curr_rsp0_ptr, next_rsp0_ptr)) = switch_params {
-        switch_ctx(curr_rsp0_ptr, next_rsp0_ptr);
+        switch_ctx(curr_rsp0_ptr as *mut u64, next_rsp0_ptr as *const u64);
     }
     if interrupts_were_enabled {
         unmask_interrupts!();

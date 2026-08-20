@@ -29,8 +29,8 @@ use crate::{
         KERNEL_AS,
         VirtualAddress,
         allocators::stack_allocator::{
-            allocate_stack,
-            deallocate_stack,
+            self,
+            *,
         },
     },
 };
@@ -138,17 +138,9 @@ impl From<id_table::Error> for Error {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug)]
 pub struct ThreadContext {
-    pub rsp_cpl0: u64,
-    _kernel_stack_buf: VirtualAddress,
-}
-
-impl Drop for ThreadContext {
-    fn drop(&mut self) {
-        deallocate_stack(self._kernel_stack_buf)
-            .expect("Failed to deallocate kernel stack for thread context.");
-    }
+    pub kernel_stack_buf: stack_allocator::StackBuf,
 }
 
 impl ThreadContext {
@@ -158,28 +150,21 @@ impl ThreadContext {
     ) -> Result<Self, Error> {
         let flags: u64 = rflags::DEFAULT_FLAGS;
         let isf = UserEntryFrames::new(asid, entry_point as u64, flags);
-        let kernel_stack_buf = allocate_stack(INIT_KERNEL_STACK_PAGES)
-            .expect("Failed to allocate kernel stack for thread context.");
-        let mut kernel_stack_top = kernel_stack_buf + INIT_KERNEL_STACK_PAGES * PAGE_SIZE;
-        isf.push_to_stack(&mut kernel_stack_top);
+        let mut kernel_stack_buf =
+            stack_allocator::StackBuf::new(INIT_KERNEL_STACK_PAGES * PAGE_SIZE)?;
+        kernel_stack_buf.push(isf)?;
         Ok(ThreadContext {
-            rsp_cpl0: <VirtualAddress as Into<u64>>::into(kernel_stack_top),
-            _kernel_stack_buf: VirtualAddress::default(),
+            kernel_stack_buf,
         })
     }
 
     pub fn create_kernel_thread_context(entry_point: extern "C" fn()) -> Result<Self, Error> {
-        let kernel_stack_buf = allocate_stack(INIT_KERNEL_STACK_PAGES)
-            .expect("Failed to allocate kernel stack for thread context.");
-        let mut kernel_stack_top = kernel_stack_buf + INIT_KERNEL_STACK_PAGES * PAGE_SIZE;
         let ksf = KernelEntryFrame::new(KERNEL_AS.lock().get_cr3(), entry_point as u64);
-        ksf.push_to_stack(&mut kernel_stack_top);
+        let mut kernel_stack_buf =
+            stack_allocator::StackBuf::new(INIT_KERNEL_STACK_PAGES * PAGE_SIZE)?;
+        kernel_stack_buf.push(ksf)?;
         Ok(ThreadContext {
-            rsp_cpl0: <VirtualAddress as Into<u64>>::into(kernel_stack_top),
-            _kernel_stack_buf: kernel_stack_buf,
+            kernel_stack_buf,
         })
     }
 }
-
-#[unsafe(no_mangle)]
-pub static TC_RSP_CPL0_OFFSET: usize = offset_of!(ThreadContext, rsp_cpl0);

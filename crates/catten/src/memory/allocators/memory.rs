@@ -1,8 +1,24 @@
-use crate::cpu::isa::interface::memory::AddressSpaceInterface;
-use crate::logln;
-use crate::memory::linear::{MemoryMapping, PageType, VirtualAddress};
-use crate::memory::physical::*;
-use crate::memory::{AddressSpace, KERNEL_AS, PHYSICAL_FRAME_ALLOCATOR, physical};
+use crate::{
+    cpu::{
+        isa::interface::memory::AddressSpaceInterface,
+        multiprocessor::spin::mutex::MutexCore,
+    },
+    logln,
+    memory::{
+        AddressSpace,
+        KERNEL_AS,
+        PHYSICAL_FRAME_ALLOCATOR,
+        linear::{
+            MemoryMapping,
+            PageType,
+            VirtualAddress,
+        },
+        physical::{
+            self,
+            *,
+        },
+    },
+};
 
 #[derive(Debug)]
 pub enum Error {
@@ -39,12 +55,11 @@ impl PageSize {
 }
 
 pub fn try_allocate_and_map_range(
+    mut kas_lk: lock_api::MutexGuard<'_, MutexCore, AddressSpace>,
     base: VirtualAddress,
     page_size: PageSize,
     num_pages: usize,
 ) -> Result<(), Error> {
-    // lock the kernel address space for writing
-    let mut kas = KERNEL_AS.lock();
     let mut mapping = MemoryMapping {
         vaddr: VirtualAddress::default(),
         paddr: PhysicalAddress::default(),
@@ -67,7 +82,7 @@ pub fn try_allocate_and_map_range(
             Ok(f) => f,
             Err(err) => {
                 // release the lock so the unmap_and_deallocate_range function can acquire it
-                drop(kas);
+                drop(kas_lk);
                 unmap_and_deallocate_range(base, page_size, page_idx);
                 return Err(Error::PfaError(err));
             }
@@ -75,9 +90,9 @@ pub fn try_allocate_and_map_range(
         let vaddr = base + (page_idx * page_size.num_bytes()) as isize;
         mapping.vaddr = vaddr;
         mapping.paddr = frame;
-        if let Err(err) = mapping_func(&mut kas, mapping.clone()) {
+        if let Err(err) = mapping_func(&mut kas_lk, mapping.clone()) {
             // release the lock so the unmap_and_deallocate_range function can acquire it
-            drop(kas);
+            drop(kas_lk);
             // deallocate and unmap the frames that were allocated
             unmap_and_deallocate_range(base, page_size, page_idx + 1);
             // deallocate the frame that was just allocated

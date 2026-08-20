@@ -16,14 +16,12 @@ use crate::cpu::isa::{
 };
 
 #[repr(transparent)]
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct VirtualAddress {
-    raw: usize,
-}
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct VirtualAddress(usize);
 
 impl core::fmt::Debug for VirtualAddress {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "VAddr({:#x})", self.raw)
+        write!(f, "VAddr({:#x})", self.0)
     }
 }
 
@@ -43,46 +41,38 @@ impl VirtualAddress {
     /// Convenience functions to get the index for each level of the page table hierarchy
 
     pub fn pml4_index(&self) -> usize {
-        (self.raw & PML4_INDEX_MASK) >> PML4_INDEX_SHIFT
+        (self.0 & PML4_INDEX_MASK) >> PML4_INDEX_SHIFT
     }
 
     pub fn pdpt_index(&self) -> usize {
-        (self.raw & PDPT_INDEX_MASK) >> PDPT_INDEX_SHIFT
+        (self.0 & PDPT_INDEX_MASK) >> PDPT_INDEX_SHIFT
     }
 
     pub fn pd_index(&self) -> usize {
-        (self.raw & PD_INDEX_MASK) >> PD_INDEX_SHIFT
+        (self.0 & PD_INDEX_MASK) >> PD_INDEX_SHIFT
     }
 
     pub fn pt_index(&self) -> usize {
-        (self.raw & PT_INDEX_MASK) >> PT_INDEX_SHIFT
+        (self.0 & PT_INDEX_MASK) >> PT_INDEX_SHIFT
     }
 
     pub fn page_offset(&self) -> usize {
-        self.raw & OFFSET_MASK
+        self.0 & OFFSET_MASK
     }
 
     /// Safety: The address must be valid and in canonical form
     pub const unsafe fn from_raw_unchecked(raw: usize) -> Self {
-        VirtualAddress {
-            raw,
-        }
+        VirtualAddress(raw)
     }
 }
 
 impl Address for VirtualAddress {
-    const MAX: Self = VirtualAddress {
-        raw: usize::MAX,
-    };
-    const MIN: Self = VirtualAddress {
-        raw: 0,
-    };
-    const NULL: Self = VirtualAddress {
-        raw: 0,
-    };
+    const MAX: Self = VirtualAddress(usize::MAX);
+    const MIN: Self = VirtualAddress(0);
+    const NULL: Self = VirtualAddress(0);
 
     fn is_aligned_to(&self, alignment: usize) -> bool {
-        self.raw % alignment == 0
+        self.0 % alignment == 0
     }
 
     fn next_aligned_to(&self, alignment: usize) -> Self {
@@ -92,13 +82,13 @@ impl Address for VirtualAddress {
     }
 
     fn prev_aligned_to(&self, alignment: usize) -> Self {
-        VirtualAddress {
-            raw: if alignment % 2 == 0 {
-                self.raw & !(alignment - 1)
+        VirtualAddress(
+            if alignment % 2 == 0 {
+                self.0 & !(alignment - 1)
             } else {
-                self.raw - (self.raw % alignment)
+                self.0 - (self.0 % alignment)
             },
-        }
+        )
     }
 
     fn is_valid(value: usize) -> bool {
@@ -106,35 +96,29 @@ impl Address for VirtualAddress {
     }
 
     fn is_null(&self) -> bool {
-        self.raw == 0
+        self.0 == 0
     }
 
     unsafe fn from_unchecked(addr: usize) -> Self {
-        VirtualAddress {
-            raw: addr,
-        }
+        VirtualAddress(addr)
     }
 }
 
 impl VirtualAddressIfce for VirtualAddress {
     fn from_ptr<T>(ptr: *const T) -> Self {
-        VirtualAddress {
-            raw: ptr as usize,
-        }
+        VirtualAddress(ptr as usize)
     }
 
     fn from_mut<T>(ptr: *mut T) -> Self {
-        VirtualAddress {
-            raw: ptr as usize,
-        }
+        VirtualAddress(ptr as usize)
     }
 
     fn into_ptr<T>(self) -> *const T {
-        self.raw as *const T
+        self.0 as *const T
     }
 
     fn into_mut<T>(self) -> *mut T {
-        self.raw as *mut T
+        self.0 as *mut T
     }
 }
 
@@ -146,15 +130,13 @@ impl From<usize> for VirtualAddress {
         } else {
             value & mask
         };
-        VirtualAddress {
-            raw: sign_extended,
-        }
+        VirtualAddress(sign_extended)
     }
 }
 
 impl Into<usize> for VirtualAddress {
     fn into(self) -> usize {
-        self.raw
+        self.0
     }
 }
 
@@ -165,7 +147,7 @@ impl From<u64> for VirtualAddress {
 }
 impl Into<u64> for VirtualAddress {
     fn into(self) -> u64 {
-        self.raw as u64
+        self.0 as u64
     }
 }
 
@@ -173,7 +155,7 @@ impl Sub for VirtualAddress {
     type Output = isize;
 
     fn sub(self, other: Self) -> Self::Output {
-        self.raw as isize - other.raw as isize
+        self.0 as isize - other.0 as isize
     }
 }
 
@@ -181,9 +163,7 @@ impl Add<isize> for VirtualAddress {
     type Output = VirtualAddress;
 
     fn add(self, other: isize) -> Self::Output {
-        VirtualAddress {
-            raw: (self.raw as isize + other) as usize,
-        }
+        VirtualAddress((self.0 as isize + other) as usize)
     }
 }
 
@@ -191,7 +171,7 @@ impl Sub<isize> for VirtualAddress {
     type Output = VirtualAddress;
 
     fn sub(self, other: isize) -> Self::Output {
-        VirtualAddress::from(self.raw - other as usize)
+        VirtualAddress::from(self.0 - other as usize)
     }
 }
 
@@ -199,7 +179,7 @@ impl Add<usize> for VirtualAddress {
     type Output = VirtualAddress;
 
     fn add(self, other: usize) -> Self::Output {
-        VirtualAddress::from(self.raw + other)
+        VirtualAddress::from(self.0 + other)
     }
 }
 
@@ -207,7 +187,7 @@ impl Sub<usize> for VirtualAddress {
     type Output = VirtualAddress;
 
     fn sub(self, other: usize) -> Self::Output {
-        VirtualAddress::from(self.raw - other)
+        VirtualAddress::from(self.0 - other)
     }
 }
 
@@ -225,55 +205,39 @@ impl Step for VirtualAddress {
         if start > end {
             (0, None)
         } else {
-            (end.raw - start.raw, Some(end.raw - start.raw))
+            (end.0 - start.0, Some(end.0 - start.0))
         }
     }
 
     fn forward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.raw.saturating_add(count) < usize::MAX {
-            Some(VirtualAddress {
-                raw: start.raw + count,
-            })
+        if start.0.saturating_add(count) < usize::MAX {
+            Some(VirtualAddress(start.0 + count))
         } else {
             None
         }
     }
 
     fn backward_checked(start: Self, count: usize) -> Option<Self> {
-        if start.raw.saturating_sub(count) > usize::MIN {
-            Some(VirtualAddress {
-                raw: start.raw - count,
-            })
+        if start.0.saturating_sub(count) > usize::MIN {
+            Some(VirtualAddress(start.0 - count))
         } else {
             None
         }
     }
 
     fn forward_overflowing(start: Self, count: usize) -> (Self, bool) {
-        let (new_raw, overflow) = start.raw.overflowing_add(count);
-        (
-            VirtualAddress {
-                raw: new_raw,
-            },
-            overflow,
-        )
+        let (new_raw, overflow) = start.0.overflowing_add(count);
+        (VirtualAddress(new_raw), overflow)
     }
 
     fn backward_overflowing(start: Self, count: usize) -> (Self, bool) {
-        let (new_raw, overflow) = start.raw.overflowing_sub(count);
-        (
-            VirtualAddress {
-                raw: new_raw,
-            },
-            overflow,
-        )
+        let (new_raw, overflow) = start.0.overflowing_sub(count);
+        (VirtualAddress(new_raw), overflow)
     }
 }
 
 impl Default for VirtualAddress {
     fn default() -> Self {
-        VirtualAddress {
-            raw: 0,
-        }
+        VirtualAddress(0)
     }
 }

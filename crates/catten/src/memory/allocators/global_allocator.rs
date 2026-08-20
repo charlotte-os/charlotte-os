@@ -1,18 +1,39 @@
-use core::ptr::NonNull;
-use core::sync::atomic::{AtomicPtr, Ordering};
+use core::{
+    ptr::NonNull,
+    sync::atomic::{
+        AtomicPtr,
+        Ordering,
+    },
+};
 
-use talc::base::Talc;
-use talc::base::binning::Binning;
-use talc::source::Source;
-use talc::*;
+use talc::{
+    base::{
+        Talc,
+        binning::Binning,
+    },
+    source::Source,
+    *,
+};
 
-use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
-use crate::cpu::multiprocessor::spin::mutex::MutexCore;
-use crate::klib::size::mebibytes;
-use crate::memory::VirtualAddress;
-use crate::memory::allocators::memory::{PageSize, try_allocate_and_map_range};
-use crate::memory::linear::address_map::LA_MAP;
-use crate::memory::linear::address_map::RegionType::KernelAllocatorArena;
+use crate::{
+    cpu::{
+        isa::interface::memory::address::VirtualAddressIfce,
+        multiprocessor::spin::mutex::MutexCore,
+    },
+    klib::size::mebibytes,
+    memory::{
+        KERNEL_AS,
+        VirtualAddress,
+        allocators::memory::{
+            PageSize,
+            try_allocate_and_map_range,
+        },
+        linear::address_map::{
+            LA_MAP,
+            RegionType::KernelAllocatorArena,
+        },
+    },
+};
 
 const INITIAL_HEAP_SIZE: usize = mebibytes(2);
 static ACQUIRE_COUNT: core::sync::atomic::AtomicUsize = core::sync::atomic::AtomicUsize::new(0);
@@ -22,6 +43,7 @@ pub static PRIMARY_ALLOCATOR: TalcLock<MutexCore, ExtendOnOom> = TalcLock::new(E
 pub fn init_primary_allocator() {
     let base = LA_MAP.get_region(KernelAllocatorArena).base;
     try_allocate_and_map_range(
+        KERNEL_AS.lock(),
         base,
         PageSize::Large,
         INITIAL_HEAP_SIZE / PageSize::Large.num_bytes(),
@@ -71,7 +93,7 @@ impl ExtendOnOom {
 unsafe impl Source for ExtendOnOom {
     fn acquire<B: Binning>(
         talc: &mut Talc<Self, B>,
-        layout: core::alloc::Layout,
+        _layout: core::alloc::Layout,
     ) -> Result<(), ()> {
         let curr_end = talc.source.heap_ptr.load(Ordering::Acquire);
         let n = ACQUIRE_COUNT.fetch_add(1, Ordering::Relaxed);
@@ -94,7 +116,7 @@ unsafe impl Source for ExtendOnOom {
         let new_region_start = VirtualAddress::from(curr_end as usize);
         let new_region_end = new_region_start + PageSize::Large.num_bytes();
         /* Actually allocate and map the new region */
-        try_allocate_and_map_range(new_region_start, PageSize::Large, 1)
+        try_allocate_and_map_range(KERNEL_AS.lock(), new_region_start, PageSize::Large, 1)
             .expect("Failed to allocate and extend the kernel heap");
         unsafe {
             talc.extend(
