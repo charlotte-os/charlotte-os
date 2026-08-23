@@ -3,29 +3,26 @@ use crate::cpu::{
     isa::{
         interrupts::Error,
         lp::{
-            InterruptSourceDiscriminator,
+            IntSrcDscr,
             LpId,
         },
     },
 };
 
 /// Dynamic Interrupt Dispatcher Interface
-pub trait DynInterruptDispatcherIfce {
+pub trait DynIhMapIfce {
     /// Set the interrupt handler for a given logical processor and vector
     fn set_dyn_ih(
         &self,
         lp: LpId,
-        vector: InterruptSourceDiscriminator,
+        vector: IntSrcDscr,
         handler: InterruptHandler,
     ) -> Result<(), Error>;
     /// Get the interrupt handler for a given vector
     /// Note: must be #[unsafe(no_mangle)] and extern "C" to be callable from assembly code
-    extern "C" fn get_dyn_ih(
-        &self,
-        vector: InterruptSourceDiscriminator,
-    ) -> *const InterruptHandler;
-    /// Check if a given vector is available for a logical processor
-    fn is_vector_available(&self, lp: LpId, vector: InterruptSourceDiscriminator) -> bool;
+    extern "C" fn get_dyn_ih(&self, vector: IntSrcDscr) -> Option<InterruptHandler>;
+    /// Find an available dynamic vector
+    fn find_available_vector(&self, lp: LpId) -> Option<IntSrcDscr>;
 }
 
 /// Local Interrupt Controller Interface
@@ -35,10 +32,7 @@ pub trait LocalIntCtlrIfce {
     /// Initialize the local interrupt controller for the current logical processor
     fn init_lp();
     /// Send an inter-processor interrupt to the specified logical processor
-    fn send_unicast_ipi(
-        target_lp: LpId,
-        target_vector: InterruptSourceDiscriminator,
-    ) -> Result<(), Self::Error>;
+    fn send_unicast_ipi(target_lp: LpId, target_vector: IntSrcDscr) -> Result<(), Self::Error>;
     /// Signal End of Interrupt
     extern "C" fn signal_eoi();
 }
@@ -53,7 +47,7 @@ pub trait ExternalInterruptControllerIfce {
     fn setup_ext_int(
         &mut self,
         lp: LpId,
-        vector: InterruptSourceDiscriminator,
+        vector: IntSrcDscr,
         pin_num: Self::EicPinNum,
         active_low: bool,
         level_triggered: bool,

@@ -13,7 +13,7 @@ use crate::{
                 OReg32Ifce,
             },
             lp::{
-                InterruptSourceDiscriminator,
+                IntSrcDscr,
                 LpId,
             },
         },
@@ -42,7 +42,7 @@ pub enum Error {
     InvalidDeliveryMode(u8),
     LpIdOutOfRange(LpId),
     RedirIndexOutOfRange(RedirIdx),
-    CannotTargetFixedVector(InterruptSourceDiscriminator),
+    CannotTargetFixedVector(IntSrcDscr),
 }
 
 #[repr(transparent)]
@@ -155,7 +155,7 @@ impl ExternalInterruptControllerIfce for IoApic {
     fn setup_ext_int(
         &mut self,
         lp: LpId,
-        vector: InterruptSourceDiscriminator,
+        vector: IntSrcDscr,
         pin_num: Self::EicPinNum,
         active_low: bool,
         level_triggered: bool,

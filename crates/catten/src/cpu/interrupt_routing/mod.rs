@@ -25,7 +25,7 @@ use crate::{
         lp::{
             EicId,
             EicPinNum,
-            InterruptSourceDiscriminator,
+            IntSrcDscr,
             LpId,
         },
     },
@@ -88,12 +88,12 @@ pub struct InterruptInput {
 
 #[derive(Default, Clone, Debug)]
 pub struct InterruptRoutingManager {
-    routes: HashMap<LpId, BTreeMap<InterruptSourceDiscriminator, InterruptInput>>,
+    routes: HashMap<LpId, BTreeMap<IntSrcDscr, InterruptInput>>,
 }
 
 pub struct InterruptTarget {
     lp_id: LpId,
-    discriminator: InterruptSourceDiscriminator,
+    discriminator: IntSrcDscr,
 }
 
 impl InterruptRoutingManager {
@@ -136,9 +136,9 @@ impl InterruptRoutingManager {
         lp
     }
 
-    fn find_free_vector(&self, lp: LpId) -> Option<InterruptSourceDiscriminator> {
+    fn find_free_vector(&self, lp: LpId) -> Option<IntSrcDscr> {
         for v in DYN_VEC_START_OFFSET..DYN_VECS_PER_LP {
-            let vector = InterruptSourceDiscriminator::from(v);
+            let vector = IntSrcDscr::from(v);
             if !self.routes[&lp].contains_key(&vector) {
                 return Some(vector);
             }
