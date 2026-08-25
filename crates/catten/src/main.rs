@@ -23,7 +23,6 @@
 extern crate alloc;
 
 pub mod cpu;
-pub mod deferred_work_manager;
 pub mod device_management;
 pub mod environment;
 pub mod init;
@@ -37,39 +36,20 @@ pub mod timers;
 use core::hint::unreachable_unchecked;
 
 use limine::mp::MpInfo;
-use spin::{
-    Barrier,
-    LazyLock,
-};
+use spin::{Barrier, LazyLock};
 
-use crate::{
-    cpu::{
-        isa::{
-            interface::{
-                interrupts::LocalIntCtlrIfce,
-                system_info::CpuInfoIfce,
-            },
-            interrupts::LocalIntCtlr,
-            lp::ops::get_lp_id,
-            system_info::CpuInfo,
-            timers::print_timer_info,
-        },
-        multiprocessor::{
-            get_lp_count,
-            startup::{
-                assign_id,
-                start_secondary_lps,
-            },
-        },
-        scheduler::{
-            spawn_thread,
-            system_scheduler::SYSTEM_SCHEDULER,
-            yield_lp,
-        },
-    },
-    device_management::topology::DEVICE_TOPOLOGY,
-    memory::KERNEL_ASID,
-};
+use crate::cpu::isa::interface::interrupts::LocalIntCtlrIfce;
+use crate::cpu::isa::interface::system_info::CpuInfoIfce;
+use crate::cpu::isa::interrupts::LocalIntCtlr;
+use crate::cpu::isa::lp::ops::get_lp_id;
+use crate::cpu::isa::system_info::CpuInfo;
+use crate::cpu::isa::timers::print_timer_info;
+use crate::cpu::multiprocessor::get_lp_count;
+use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
+use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
+use crate::cpu::scheduler::{spawn_thread, yield_lp};
+use crate::device_management::topology::DEVICE_TOPOLOGY;
+use crate::memory::KERNEL_ASID;
 
 const KERNEL_VERSION: (u64, u64, u64) = (0, 8, 1);
 static INIT_BARRIER: LazyLock<Barrier> = LazyLock::new(|| Barrier::new(get_lp_count() as usize));
