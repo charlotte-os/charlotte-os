@@ -51,7 +51,7 @@ checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 
 [[package]]
 name = "catten"
-version = "0.8.1"
+version = "0.9.5"
 dependencies = [
  "concurrent-queue",
  "flanterm_bindings",
