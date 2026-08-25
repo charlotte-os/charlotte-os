@@ -20,9 +20,12 @@ pub trait DynIhMapIfce {
     ) -> Result<(), Error>;
     /// Get the interrupt handler for a given vector
     /// Note: must be #[unsafe(no_mangle)] and extern "C" to be callable from assembly code
-    extern "C" fn get_dyn_ih(&self, vector: IntSrcDscr) -> Option<InterruptHandler>;
+    extern "C" fn get_local_dyn_ih(&self, vector: IntSrcDscr) -> Option<InterruptHandler>;
+    /// Clear the assigned interrupt handler for a given logical processor and vector if there is
+    /// one
+    fn clear_dyn_ih(&self, lp: LpId, vector: IntSrcDscr) -> Result<(), Error>;
     /// Find an available dynamic vector
-    fn find_available_vector(&self, lp: LpId) -> Option<IntSrcDscr>;
+    fn find_available_vector(&self) -> Option<IntSrcDscr>;
 }
 
 /// Local Interrupt Controller Interface

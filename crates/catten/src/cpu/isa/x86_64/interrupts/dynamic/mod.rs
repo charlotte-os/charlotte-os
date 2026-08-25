@@ -1,24 +1,9 @@
 mod stubs;
 
-use alloc::{
-    boxed::Box,
-    vec,
-};
-use core::{
-    mem::{
-        transmute,
-        type_info::Int,
-    },
-    num::NonZeroUsize,
-    ops::{
-        Index,
-        IndexMut,
-    },
-    sync::atomic::{
-        Atomic,
-        AtomicUsize,
-        Ordering,
-    },
+use alloc::boxed::Box;
+use core::ops::{
+    Index,
+    IndexMut,
 };
 
 use spin::LazyLock;
@@ -30,7 +15,6 @@ use crate::{
             constants::interrupt_vectors::{
                 DYN_VEC_START_OFFSET,
                 DYN_VECS_PER_LP,
-                FIXED_INTERRUPT_VECTORS,
             },
             interface::interrupts::DynIhMapIfce,
             interrupts::Error,
@@ -40,7 +24,10 @@ use crate::{
                 ops::get_lp_id,
             },
         },
-        multiprocessor::get_lp_count,
+        multiprocessor::{
+            get_lp_count,
+            spin::rwlock::RwLock,
+        },
     },
     klib::collections::boxed_slice::make_boxed_slice,
 };
@@ -60,29 +47,29 @@ impl LpDynIhTable {
         self.vectors_used
     }
 
-    fn get(&self, index: usize) -> &Option<InterruptHandler> {
-        &self.table[index]
+    fn get(&self, index: IntSrcDscr) -> &Option<InterruptHandler> {
+        &self.table[index as usize]
     }
 
-    fn get_copied(&self, index: usize) -> Option<InterruptHandler> {
-        self.table[index].clone()
+    fn get_copied(&self, index: IntSrcDscr) -> Option<InterruptHandler> {
+        self.table[index as usize].clone()
     }
 
-    fn get_mut(&mut self, index: usize) -> &mut Option<InterruptHandler> {
-        &mut self.table[index]
+    fn get_mut(&mut self, index: IntSrcDscr) -> &mut Option<InterruptHandler> {
+        &mut self.table[index as usize]
     }
 }
 
-impl Index<usize> for LpDynIhTable {
+impl Index<IntSrcDscr> for LpDynIhTable {
     type Output = Option<InterruptHandler>;
 
-    fn index(&self, index: usize) -> &Self::Output {
+    fn index(&self, index: IntSrcDscr) -> &Self::Output {
         self.get(index)
     }
 }
 
-impl IndexMut<usize> for LpDynIhTable {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+impl IndexMut<IntSrcDscr> for LpDynIhTable {
+    fn index_mut(&mut self, index: IntSrcDscr) -> &mut Self::Output {
         self.get_mut(index)
     }
 }
@@ -92,17 +79,17 @@ impl IndexMut<usize> for LpDynIhTable {
 /// interrupt handlers.
 #[derive(Debug)]
 pub struct DynIhMap {
-    map_table: Box<[LpDynIhTable]>,
+    map_table: RwLock<Box<[LpDynIhTable]>>,
 }
 
 impl DynIhMap {
     /// Creates a new dynamic interrupt handler map with all entries initialized to `None`.
     fn new() -> Self {
         Self {
-            map_table: make_boxed_slice(get_lp_count() as usize, || LpDynIhTable {
+            map_table: RwLock::new(make_boxed_slice(get_lp_count() as usize, || LpDynIhTable {
                 vectors_used: 0,
                 table: [None; DYN_VECS_PER_LP as usize],
-            }),
+            })),
         }
     }
 
@@ -113,22 +100,78 @@ impl DynIhMap {
     /// Attempts to retrieve the interrupt handler for the given dynamic vector and returns a rich
     /// error type if needed. Not directly callable from assembly code; use `get_dyn_ih` for
     /// that purpose.
-    pub fn get_handler(&self, vec: IntSrcDscr) -> Result<InterruptHandler, Error> {
-        if core::hint::likely(Self::in_dyn_vec_range(vec)) {
-            let curr_lp = get_lp_id() as usize;
-            let vec_index = (vec - DYN_VEC_START_OFFSET) as usize;
-            self.map_table[curr_lp].get_copied(vec_index).ok_or(Error::IntVecUnassigned(vec))
+    pub fn get_handler(&self, lp: LpId, vector: IntSrcDscr) -> Result<InterruptHandler, Error> {
+        if core::hint::likely(Self::in_dyn_vec_range(vector)) {
+            self.map_table.read()[lp as usize]
+                .get_copied(vector)
+                .ok_or(Error::IntVecUnassigned(vector))
         } else {
-            Err(Error::ArgIsFixedIntVec(vec))
+            Err(Error::ArgIsFixedIntVec(vector))
         }
+    }
+
+    fn find_least_loaded_lp_idx(&self) -> usize {
+        let map_table = self.map_table.read();
+        map_table
+            .iter()
+            .enumerate()
+            .min_by_key(|&(_, lp_table)| lp_table.vectors_used)
+            .map(|(i, _)| i)
+            .unwrap()
     }
 }
 
 impl DynIhMapIfce for DynIhMap {
-    extern "C" fn get_dyn_ih(&self, vector: IntSrcDscr) -> Option<InterruptHandler> {
-        match self.get_handler(vector) {
+    fn set_dyn_ih(
+        &self,
+        lp: LpId,
+        vector: IntSrcDscr,
+        handler: InterruptHandler,
+    ) -> Result<(), Error> {
+        if !Self::in_dyn_vec_range(vector) {
+            return Err(Error::ArgIsFixedIntVec(vector));
+        }
+
+        let lp_index = lp as usize;
+        let mut lp_table = self.map_table.write()[lp_index];
+
+        if lp_table.get_mut(vector).is_none() {
+            *lp_table.get_mut(vector) = Some(handler);
+            lp_table.vectors_used += 1;
+        }
+        Ok(())
+    }
+
+    extern "C" fn get_local_dyn_ih(&self, vector: IntSrcDscr) -> Option<InterruptHandler> {
+        match self.get_handler(get_lp_id(), vector) {
             Ok(handler) => Some(handler),
             Err(_) => None,
         }
+    }
+
+    fn clear_dyn_ih(&self, lp: LpId, vector: IntSrcDscr) -> Result<(), Error> {
+        if !Self::in_dyn_vec_range(vector) {
+            return Err(Error::ArgIsFixedIntVec(vector));
+        }
+
+        let lp_index = lp as usize;
+        let mut lp_table = self.map_table.write()[lp_index];
+
+        if lp_table.get_mut(vector).is_some() {
+            *lp_table.get_mut(vector) = None;
+            lp_table.vectors_used -= 1;
+        }
+        Ok(())
+    }
+
+    fn find_available_vector(&self) -> Option<IntSrcDscr> {
+        let lp_idx = self.find_least_loaded_lp_idx();
+        let lp_table = self.map_table.read()[lp_idx];
+        for i in DYN_VEC_START_OFFSET..(DYN_VEC_START_OFFSET + DYN_VECS_PER_LP) {
+            if lp_table.get(i).is_none() {
+                return Some(i);
+            }
+        }
+        None
     }
 }
