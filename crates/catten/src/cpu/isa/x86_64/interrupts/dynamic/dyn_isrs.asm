@@ -25,10 +25,10 @@ dyn_isr_\vector:
     mov rbp, rsp
     and rsp, ~0xf
 //; Call the function to get the current function pointer value for this vector
-    lea rdi, [DYN_IH_MATRIX]
+    lea rdi, [DYN_IH_MAP]
     mov rsi, \vector
-    call get_dyn_ih
-//; if the function pointer returned by get_dyn_ih is null, skip the call
+    call get_local_dyn_ih
+//; if the function pointer returned by get_dyn_ih is null (actually Option::None as seen by Rust), skip the call
     test rax, rax
     jz skip_ih_call_\vector
 //; make the call to the interrupt handler if the function pointer is non-null

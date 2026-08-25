@@ -125,6 +125,7 @@ impl DynIhMapIfce for DynIhMap {
         Ok(())
     }
 
+    #[unsafe(no_mangle)]
     extern "C" fn get_local_dyn_ih(&self, vector: IntSrcDscr) -> Option<InterruptHandler> {
         match self.get_handler(get_lp_id(), vector) {
             Ok(handler) => Some(handler),
