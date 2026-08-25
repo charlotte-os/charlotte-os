@@ -1,19 +1,11 @@
 use alloc::vec::Vec;
 use core::ptr::read_unaligned;
 
-use crate::{
-    device_management::drivers::busses::pci_express::topology::PcieSegmentGroup,
-    environment::acpi::{
-        AcpiTableType,
-        SdtHeader,
-        TABLE_MAP,
-    },
-    logln,
-    memory::{
-        PhysicalAddress,
-        physical::PhysicalAddressIfce,
-    },
-};
+use crate::device_management::drivers::busses::pci_express::topology::PcieSegmentGroup;
+use crate::environment::acpi::{AcpiTableType, SdtHeader, TABLE_MAP};
+use crate::logln;
+use crate::memory::PhysicalAddress;
+use crate::memory::physical::PhysicalAddressIfce;
 
 const MCFG_HEADER_RESERVED_SIZE: usize = 8;
 const MCFG_HEADER_SIZE: usize = core::mem::size_of::<SdtHeader>() + MCFG_HEADER_RESERVED_SIZE;
@@ -58,11 +50,11 @@ pub fn parse_mcfg() -> Vec<PcieSegmentGroup> {
 #[derive(Debug)]
 #[repr(C, packed)]
 struct McfgEntry {
-    ecam_base: PhysicalAddress,
+    ecam_base:        PhysicalAddress,
     pcie_segment_num: u16,
-    start_bus_num: u8,
-    end_bus_num: u8,
-    _reserved: u32,
+    start_bus_num:    u8,
+    end_bus_num:      u8,
+    _reserved:        u32,
 }
 
 fn parse_mcfg_entry(entry: *const McfgEntry) -> PcieSegmentGroup {

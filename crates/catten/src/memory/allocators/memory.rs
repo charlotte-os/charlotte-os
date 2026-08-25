@@ -1,24 +1,9 @@
-use crate::{
-    cpu::{
-        isa::interface::memory::AddressSpaceInterface,
-        multiprocessor::spin::mutex::MutexCore,
-    },
-    logln,
-    memory::{
-        AddressSpace,
-        KERNEL_AS,
-        PHYSICAL_FRAME_ALLOCATOR,
-        linear::{
-            MemoryMapping,
-            PageType,
-            VirtualAddress,
-        },
-        physical::{
-            self,
-            *,
-        },
-    },
-};
+use crate::cpu::isa::interface::memory::AddressSpaceInterface;
+use crate::cpu::multiprocessor::spin::mutex::MutexCore;
+use crate::logln;
+use crate::memory::linear::{MemoryMapping, PageType, VirtualAddress};
+use crate::memory::physical::{self, *};
+use crate::memory::{AddressSpace, KERNEL_AS, PHYSICAL_FRAME_ALLOCATOR};
 
 #[derive(Debug)]
 pub enum Error {
@@ -61,8 +46,8 @@ pub fn try_allocate_and_map_range(
     num_pages: usize,
 ) -> Result<(), Error> {
     let mut mapping = MemoryMapping {
-        vaddr: VirtualAddress::default(),
-        paddr: PhysicalAddress::default(),
+        vaddr:     VirtualAddress::default(),
+        paddr:     PhysicalAddress::default(),
         page_type: PageType::KernelData,
     };
     let alloc_func = match page_size {

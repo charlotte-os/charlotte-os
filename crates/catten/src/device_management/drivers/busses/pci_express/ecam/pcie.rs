@@ -19,13 +19,13 @@ pub const PCIE_CFG_SPACE_SIZE: usize = 4096;
 /// configuration space overlay struct while exposing a safe interface to the rest of the system.
 pub union ExtCapSpace {
     pci_local: (),
-    pcie: [u8; PCIE_CFG_SPACE_SIZE - PCI_LOCAL_CFG_SPACE_SIZE],
+    pcie:      [u8; PCIE_CFG_SPACE_SIZE - PCI_LOCAL_CFG_SPACE_SIZE],
 }
 
 #[repr(C, packed)]
 /// An overlay struct representing the entire 4KB configuration space of a PCIe device in an ECAM
 pub struct PcieCfgSpace {
-    pub header: headers::CfgHeader,
+    pub header:               headers::CfgHeader,
     pub capability_space:
         [u8; PCI_LOCAL_CFG_SPACE_SIZE - core::mem::size_of::<headers::CfgHeader>()],
     /* The extended capability space should only be used if the PCIe capability is present in

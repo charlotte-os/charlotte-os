@@ -1,22 +1,10 @@
 use alloc::boxed::Box;
 
-use crate::{
-    cpu::{
-        isa::lp::{
-            LpId,
-            ops::get_lp_id,
-        },
-        multiprocessor::{
-            get_lp_count,
-            spin::rwlock::{
-                RwLock,
-                RwLockReadGuard,
-                RwLockWriteGuard,
-            },
-        },
-    },
-    klib::collections::boxed_slice::make_boxed_slice,
-};
+use crate::cpu::isa::lp::LpId;
+use crate::cpu::isa::lp::ops::get_lp_id;
+use crate::cpu::multiprocessor::get_lp_count;
+use crate::cpu::multiprocessor::spin::rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use crate::klib::collections::boxed_slice::make_boxed_slice;
 
 #[derive(Debug)]
 pub enum Error {

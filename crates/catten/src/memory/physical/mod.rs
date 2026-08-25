@@ -6,28 +6,15 @@
 use limine::memmap::MEMMAP_USABLE;
 pub use limine::request::MemmapResponse;
 
-pub use crate::cpu::isa::{
-    interface::memory::{
-        MemoryInterface,
-        address::PhysicalAddressIfce,
-    },
-    memory::{
-        MemoryInterfaceImpl,
-        address::paddr::{
-            PhysicalAddress,
-            PhysicalAddressError,
-        },
-    },
-};
-use crate::{
-    cpu::isa::interface::memory::address::Address,
-    early_logln,
-    klib::{
-        constants::BITS_PER_BYTE,
-        size::kibibytes,
-    },
-    memory::allocators::memory::PageSize,
-};
+pub use crate::cpu::isa::interface::memory::MemoryInterface;
+use crate::cpu::isa::interface::memory::address::Address;
+pub use crate::cpu::isa::interface::memory::address::PhysicalAddressIfce;
+pub use crate::cpu::isa::memory::MemoryInterfaceImpl;
+pub use crate::cpu::isa::memory::address::paddr::{PhysicalAddress, PhysicalAddressError};
+use crate::early_logln;
+use crate::klib::constants::BITS_PER_BYTE;
+use crate::klib::size::kibibytes;
+use crate::memory::allocators::memory::PageSize;
 
 /// Page frames are 4 KiB in size on all supported architectures.
 const PAGE_FRAME_SIZE: usize = kibibytes(4);
@@ -58,8 +45,8 @@ impl From<PhysicalAddressError> for Error {
 
 #[derive(Debug)]
 pub struct PhysicalFrameAllocator {
-    bitmap_ptr: *mut u8,
-    bitmap_len: usize,
+    bitmap_ptr:     *mut u8,
+    bitmap_len:     usize,
     next_free_hint: usize,
 }
 
@@ -286,8 +273,8 @@ impl From<&MemmapResponse> for PhysicalFrameAllocator {
         let bitmap_addr: PhysicalAddress = find_mmap_best_fit(response, bitmap_size).unwrap();
         early_logln!("PhysicalFrameAllocator bitmap addr (physical): {:?}", bitmap_addr);
         let pfa = PhysicalFrameAllocator {
-            bitmap_ptr: unsafe { bitmap_addr.into_hhdm_mut::<u8>() },
-            bitmap_len: bitmap_size,
+            bitmap_ptr:     unsafe { bitmap_addr.into_hhdm_mut::<u8>() },
+            bitmap_len:     bitmap_size,
             next_free_hint: 0,
         };
         // Initially mark all frames as unavailable.

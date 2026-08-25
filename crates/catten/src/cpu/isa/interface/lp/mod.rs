@@ -15,7 +15,5 @@
  * See the x86_64 implementation for examples.
  */
 
-use crate::cpu::isa::{
-    interrupts::LocalIntCtlr,
-    timers::LpTimer,
-};
+use crate::cpu::isa::interrupts::LocalIntCtlr;
+use crate::cpu::isa::timers::LpTimer;

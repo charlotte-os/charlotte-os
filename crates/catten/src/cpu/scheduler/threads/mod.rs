@@ -31,9 +31,9 @@ pub enum ThreadState {
 
 #[derive(Debug)]
 pub struct Thread {
-    pub context: ThreadContext,
-    pub asid: AddressSpaceId,
-    pub state: ThreadState,
+    pub context:    ThreadContext,
+    pub asid:       AddressSpaceId,
+    pub state:      ThreadState,
     exit_observers: spin::Mutex<Vec<Weak<dyn Observer>>>,
 }
 

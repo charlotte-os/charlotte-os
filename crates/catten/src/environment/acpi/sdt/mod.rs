@@ -22,8 +22,8 @@ pub enum GasAddressSpace {
 #[repr(C, packed)]
 pub struct GenericAddressStructure {
     address_space: GasAddressSpace,
-    bit_width: u8,
-    bit_offset: u8,
-    access_size: u8, // 8 * pow(2, AccessSize) bytes
-    address: u64,
+    bit_width:     u8,
+    bit_offset:    u8,
+    access_size:   u8, // 8 * pow(2, AccessSize) bytes
+    address:       u64,
 }

@@ -39,13 +39,13 @@ const MOUSE_ENABLE_REPORTING: u8 = 0xf4;
 const MOUSE_DISABLE_REPORTING: u8 = 0xf5;
 
 pub struct I8042 {
-    data: IoReg8,
+    data:   IoReg8,
     status: IoReg8,
 }
 
 pub struct Ps2Status {
     pub keyboard_ok: bool,
-    pub mouse_ok: bool,
+    pub mouse_ok:    bool,
 }
 
 impl I8042 {
@@ -87,11 +87,11 @@ impl I8042 {
         // The status.
         let mut status = Ps2Status {
             keyboard_ok: false,
-            mouse_ok: false,
+            mouse_ok:    false,
         };
 
         let driver = I8042 {
-            data: IoReg8::IoPort(DATA_PORT),
+            data:   IoReg8::IoPort(DATA_PORT),
             status: IoReg8::IoPort(STATUS_PORT),
         };
 
@@ -113,7 +113,7 @@ impl I8042 {
             if driver.data.read() != CONTROLLER_TEST_OK {
                 return Err(Ps2Status {
                     keyboard_ok: false,
-                    mouse_ok: false,
+                    mouse_ok:    false,
                 });
             }
 

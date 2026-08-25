@@ -1,19 +1,8 @@
-use core::{
-    iter::Step,
-    ops::{
-        Add,
-        AddAssign,
-        Sub,
-    },
-};
+use core::iter::Step;
+use core::ops::{Add, AddAssign, Sub};
 
-use crate::cpu::isa::{
-    interface::memory::address::{
-        Address,
-        VirtualAddressIfce,
-    },
-    memory::address::VADDR_SIG_BITS,
-};
+use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
+use crate::cpu::isa::memory::address::VADDR_SIG_BITS;
 
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

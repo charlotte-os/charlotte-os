@@ -83,5 +83,6 @@ impl InterruptRoutingManager {
         source: InterruptSource,
         handler: InterruptHandler,
     ) -> Result<InterruptTarget, Error> {
+        todo!()
     }
 }

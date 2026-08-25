@@ -5,30 +5,15 @@ pub mod linear;
 pub mod physical;
 
 pub use linear::VirtualAddress;
-pub use physical::{
-    MemoryInterface,
-    PhysicalAddress,
-    PhysicalFrameAllocator,
-};
+pub use physical::{MemoryInterface, PhysicalAddress, PhysicalFrameAllocator};
 pub use spin::LazyLock;
 
-use crate::environment::boot_protocol::limine::{
-    HHDM_REQUEST,
-    MEMORY_MAP_REQUEST,
-};
-pub use crate::{
-    cpu::{
-        isa::{
-            interface::memory::AddressSpaceInterface,
-            memory::paging::AddressSpace,
-        },
-        multiprocessor::spin::{
-            mutex::Mutex,
-            rwlock::RwLock,
-        },
-    },
-    klib::collections::id_table::IdTable,
-};
+pub use crate::cpu::isa::interface::memory::AddressSpaceInterface;
+pub use crate::cpu::isa::memory::paging::AddressSpace;
+pub use crate::cpu::multiprocessor::spin::mutex::Mutex;
+pub use crate::cpu::multiprocessor::spin::rwlock::RwLock;
+use crate::environment::boot_protocol::limine::{HHDM_REQUEST, MEMORY_MAP_REQUEST};
+pub use crate::klib::collections::id_table::IdTable;
 
 pub type AddressSpaceId = usize;
 

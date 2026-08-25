@@ -13,48 +13,20 @@
 use alloc::vec::Vec;
 
 use hashbrown::HashSet;
-use spin::{
-    LazyLock,
-    RwLock,
-};
+use spin::{LazyLock, RwLock};
 
 use super::memory;
-use crate::{
-    cpu::{
-        isa::{
-            interface::memory::address::{
-                Address,
-                VirtualAddressIfce,
-            },
-            memory::{
-                MemoryInterface,
-                MemoryInterfaceImpl,
-                paging::PAGE_SIZE,
-            },
-        },
-        multiprocessor::spin::mutex::Mutex,
-    },
-    klib::size,
-    memory::{
-        AddressSpaceInterface,
-        KERNEL_AS,
-        allocators::{
-            self,
-            memory::{
-                PageSize,
-                try_allocate_and_map_range,
-            },
-        },
-        linear::{
-            VirtualAddress,
-            address_map::{
-                LA_MAP,
-                LinearMemoryRegion,
-                RegionType::KernelStackArena,
-            },
-        },
-    },
-};
+use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
+use crate::cpu::isa::memory::paging::PAGE_SIZE;
+use crate::cpu::isa::memory::{MemoryInterface, MemoryInterfaceImpl};
+use crate::cpu::multiprocessor::spin::mutex::Mutex;
+use crate::klib::size;
+use crate::memory::allocators::memory::{PageSize, try_allocate_and_map_range};
+use crate::memory::allocators::{self};
+use crate::memory::linear::VirtualAddress;
+use crate::memory::linear::address_map::RegionType::KernelStackArena;
+use crate::memory::linear::address_map::{LA_MAP, LinearMemoryRegion};
+use crate::memory::{AddressSpaceInterface, KERNEL_AS};
 
 pub static KERNEL_GUARD_PAGE_SET: LazyLock<RwLock<HashSet<VirtualAddress>>> =
     LazyLock::new(|| RwLock::new(HashSet::new()));
@@ -86,8 +58,8 @@ impl From<allocators::memory::Error> for Error {
 #[derive(Debug)]
 pub struct StackBuf {
     raw_buf_start: VirtualAddress,
-    size: usize,
-    pub curr_sp: VirtualAddress,
+    size:          usize,
+    pub curr_sp:   VirtualAddress,
 }
 
 impl StackBuf {
@@ -148,8 +120,8 @@ impl StackBuf {
     unsafe fn shallow_clone(&self) -> Self {
         Self {
             raw_buf_start: self.raw_buf_start,
-            size: self.size,
-            curr_sp: self.initial_sp(),
+            size:          self.size,
+            curr_sp:       self.initial_sp(),
         }
     }
 }

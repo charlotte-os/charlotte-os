@@ -30,8 +30,8 @@ pub fn start_secondary_lps() -> Result<(), MpError> {
                 } else {
                     panic!("Processor not supported: x2APIC mode is not available.");
                 }
-            },
-            _ => {/* Non-x86_64 ISAs require no special secondary processor startup handling */}
+            }
+            _ => { /* Non-x86_64 ISAs require no special secondary processor startup handling */ }
         }
         let lps = res.cpus();
         for lp in lps {

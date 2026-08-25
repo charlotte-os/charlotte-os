@@ -14,11 +14,11 @@ use crate::device_management::hw_interface::HwDeviceIfce;
 /// The source for all IDs and codes used in this module and all its submodules is `https://pci-ids.ucw.cz/`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PciIdentifier {
-    pub vendor_id: u16,
-    pub device_id: u16,
+    pub vendor_id:  u16,
+    pub device_id:  u16,
     pub class_code: u8,
-    pub subclass: u8,
-    pub prog_if: u8,
+    pub subclass:   u8,
+    pub prog_if:    u8,
 }
 
 impl Display for PciIdentifier {

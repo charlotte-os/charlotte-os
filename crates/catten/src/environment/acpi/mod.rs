@@ -189,16 +189,16 @@ impl TryFrom<[u8; 4]> for AcpiTableType {
 #[repr(C, packed)]
 #[derive(Debug)]
 pub struct Xsdp {
-    signature: [u8; 8],
-    checksum: u8,
-    oem_id: [u8; 6],
-    revision: u8,
+    signature:    [u8; 8],
+    checksum:     u8,
+    oem_id:       [u8; 6],
+    revision:     u8,
     rsdt_address: u32, // deprecated since version 2.0
 
-    length: u32,
-    xsdt_address: u64,
+    length:            u32,
+    xsdt_address:      u64,
     extended_checksum: u8,
-    reserved: [u8; 3],
+    reserved:          [u8; 3],
 }
 
 impl Xsdp {
@@ -217,14 +217,14 @@ impl Xsdp {
 #[repr(C, packed)]
 #[derive(Debug, Clone, Copy)]
 pub struct SdtHeader {
-    signature: [u8; 4],
-    length: u32,
-    revision: u8,
-    checksum: u8,
-    oem_id: [u8; 6],
-    oem_table_id: [u8; 8],
-    oem_revision: u32,
-    creator_id: u32,
+    signature:        [u8; 4],
+    length:           u32,
+    revision:         u8,
+    checksum:         u8,
+    oem_id:           [u8; 6],
+    oem_table_id:     [u8; 8],
+    oem_revision:     u32,
+    creator_id:       u32,
     creator_revision: u32,
 }
 

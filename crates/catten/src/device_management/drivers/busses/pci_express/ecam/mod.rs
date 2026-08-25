@@ -4,25 +4,12 @@ pub mod capabilities;
 pub mod headers;
 pub mod pcie;
 
-use crate::{
-    klib::size::mebibytes,
-    logln,
-    memory::{
-        AddressSpaceInterface,
-        KERNEL_AS,
-        PhysicalAddress,
-        VirtualAddress,
-        allocators::memory::PageSize,
-        linear::{
-            MemoryMapping,
-            address_map::{
-                LA_MAP,
-                LinearMemoryRegion,
-                RegionType,
-            },
-        },
-    },
-};
+use crate::klib::size::mebibytes;
+use crate::logln;
+use crate::memory::allocators::memory::PageSize;
+use crate::memory::linear::MemoryMapping;
+use crate::memory::linear::address_map::{LA_MAP, LinearMemoryRegion, RegionType};
+use crate::memory::{AddressSpaceInterface, KERNEL_AS, PhysicalAddress, VirtualAddress};
 
 const ECAM_SIZE: usize = mebibytes(256); /* Each PCIe segment group's ECAM occupies 256 MiB of address space */
 
@@ -51,8 +38,8 @@ pub(super) fn map_ecam(base: PhysicalAddress) -> VirtualAddress {
     let mut mem_mapping: MemoryMapping;
     for offset in (0..ECAM_SIZE).step_by(mebibytes(2)) {
         mem_mapping = MemoryMapping {
-            vaddr: vbase + offset,
-            paddr: base + offset,
+            vaddr:     vbase + offset,
+            paddr:     base + offset,
             page_type: crate::memory::linear::PageType::Mmio,
         };
         kas.map_large_page(mem_mapping).expect("Failed to map large page for a PCIe ECAM!");

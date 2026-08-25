@@ -16,19 +16,19 @@ type GlobalSystemInterrupt = u32;
 #[derive(Debug)]
 #[repr(C, packed)]
 struct MadtEntryGeneric {
-    entry_type: u8,
+    entry_type:   u8,
     entry_length: u8,
 }
 
 struct MadtEntryIter {
-    ptr: Option<NonNull<MadtEntryGeneric>>,
+    ptr:     Option<NonNull<MadtEntryGeneric>>,
     end_ptr: VirtualAddress,
 }
 
 impl MadtEntryIter {
     pub fn new(madt_ptr: *const Madt) -> Self {
         Self {
-            ptr: unsafe {
+            ptr:     unsafe {
                 NonNull::new((madt_ptr as *const u8).add(core::mem::size_of::<Madt>())
                     as *mut MadtEntryGeneric)
             },
@@ -45,7 +45,8 @@ impl Iterator for MadtEntryIter {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(nn_ptr) = self.ptr {
             let entry_length = unsafe { nn_ptr.read() }.entry_length;
-            if VirtualAddress::from_ptr(unsafe { nn_ptr.as_ptr().add(entry_length as usize) }) > self.end_ptr
+            if VirtualAddress::from_ptr(unsafe { nn_ptr.as_ptr().add(entry_length as usize) })
+                > self.end_ptr
             {
                 self.ptr = None;
             } else {
@@ -71,9 +72,9 @@ impl MadtEntryIndex {
 #[derive(Debug)]
 #[repr(C, packed)]
 pub struct Madt {
-    header: SdtHeader,
+    header:        SdtHeader,
     lapic_address: u32,
-    flags: u32,
+    flags:         u32,
 }
 
 impl Madt {
