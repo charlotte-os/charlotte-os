@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(abi_custom)]
 #![feature(extend_one)]
 #![feature(iter_advance_by)]
 #![feature(likely_unlikely)]
