@@ -112,11 +112,11 @@ pub extern "C" fn bsp_main() -> ! {
     logln!("Spawning initial kernel thread to probe device topology...");
     let thread_id = spawn_thread(KERNEL_ASID, probe_device_topology);
     logln!("Initial thread spawned with ID = {thread_id}.");
-    for _ in 0..(get_lp_count() * 2) {
-        logln!("Spawning additional kernel threads to test scheduler...");
-        let thread_id = spawn_thread(KERNEL_ASID, test_fn);
-        logln!("Additional thread spawned with ID = {thread_id}.");
-    }
+    // for _ in 0..(get_lp_count() * 2) {
+    //     logln!("Spawning additional kernel threads to test scheduler...");
+    //     let thread_id = spawn_thread(KERNEL_ASID, test_fn);
+    //     logln!("Additional thread spawned with ID = {thread_id}.");
+    // }
     unmask_interrupts!();
     logln!("Submitted all initial kernel threads.");
     logln!(
