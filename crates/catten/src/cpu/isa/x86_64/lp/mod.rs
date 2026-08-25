@@ -5,6 +5,6 @@ pub mod thread_context;
 pub type LpId = u32;
 pub type CoreId = u32;
 
-pub type EicId = u8;
-pub type EicPinNum = u8;
+pub type WiredIntCtlrId = u8;
+pub type WiredIntCtlrPinNum = u8;
 pub type IntSrcDscr = u8;

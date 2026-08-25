@@ -1,13 +1,6 @@
-use crate::cpu::{
-    interrupt_routing::InterruptHandler,
-    isa::{
-        interrupts::Error,
-        lp::{
-            IntSrcDscr,
-            LpId,
-        },
-    },
-};
+use crate::cpu::isa::interrupts::Error;
+use crate::cpu::isa::lp::{IntSrcDscr, LpId};
+use crate::device_management::interrupt_routing::InterruptHandler;
 
 /// Dynamic Interrupt Dispatcher Interface
 pub trait DynIhMapIfce {

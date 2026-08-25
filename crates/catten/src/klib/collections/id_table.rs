@@ -10,14 +10,14 @@ pub enum Error {
 
 #[derive(Debug)]
 pub struct IdTable<T> {
-    list: Vec<Option<T>>,
+    list:          Vec<Option<T>>,
     available_ids: Vec<usize>,
 }
 
 impl<'a, T> IdTable<T> {
     pub fn new() -> Self {
         IdTable {
-            list: Vec::new(),
+            list:          Vec::new(),
             available_ids: Vec::new(),
         }
     }

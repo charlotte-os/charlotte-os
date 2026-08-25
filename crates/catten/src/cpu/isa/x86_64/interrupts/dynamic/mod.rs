@@ -1,36 +1,19 @@
 mod stubs;
 
 use alloc::boxed::Box;
-use core::ops::{
-    Index,
-    IndexMut,
-};
+use core::ops::{Index, IndexMut};
 
 use spin::LazyLock;
 
-use crate::{
-    cpu::{
-        interrupt_routing::InterruptHandler,
-        isa::{
-            constants::interrupt_vectors::{
-                DYN_VEC_START_OFFSET,
-                DYN_VECS_PER_LP,
-            },
-            interface::interrupts::DynIhMapIfce,
-            interrupts::Error,
-            lp::{
-                IntSrcDscr,
-                LpId,
-                ops::get_lp_id,
-            },
-        },
-        multiprocessor::{
-            get_lp_count,
-            spin::rwlock::RwLock,
-        },
-    },
-    klib::collections::boxed_slice::make_boxed_slice,
-};
+use crate::cpu::isa::constants::interrupt_vectors::{DYN_VEC_START_OFFSET, DYN_VECS_PER_LP};
+use crate::cpu::isa::interface::interrupts::DynIhMapIfce;
+use crate::cpu::isa::interrupts::Error;
+use crate::cpu::isa::lp::ops::get_lp_id;
+use crate::cpu::isa::lp::{IntSrcDscr, LpId};
+use crate::cpu::multiprocessor::get_lp_count;
+use crate::cpu::multiprocessor::spin::rwlock::RwLock;
+use crate::device_management::interrupt_routing::InterruptHandler;
+use crate::klib::collections::boxed_slice::make_boxed_slice;
 
 /// The instance of the dynamic interrupt handler matrix
 #[unsafe(no_mangle)]
@@ -39,7 +22,7 @@ pub static DYN_IH_MAP: LazyLock<DynIhMap> = LazyLock::new(DynIhMap::new);
 #[derive(Debug, Clone, Copy)]
 struct LpDynIhTable {
     vectors_used: u8,
-    table: [Option<InterruptHandler>; DYN_VECS_PER_LP as usize],
+    table:        [Option<InterruptHandler>; DYN_VECS_PER_LP as usize],
 }
 
 impl LpDynIhTable {
@@ -88,7 +71,7 @@ impl DynIhMap {
         Self {
             map_table: RwLock::new(make_boxed_slice(get_lp_count() as usize, || LpDynIhTable {
                 vectors_used: 0,
-                table: [None; DYN_VECS_PER_LP as usize],
+                table:        [None; DYN_VECS_PER_LP as usize],
             })),
         }
     }
