@@ -19,7 +19,6 @@ CharlotteOS aims to support platforms that offer **standardized, documented, and
 
 - Invariant Timestamp Counter
 - Local APIC with x2APIC mode
-- Always Running APIC Timer (ARAT) available on all logical processors
 - Full standards conforming UEFI and ACPI firmware environment
 - Intel or AMD compatible IOMMU
 
