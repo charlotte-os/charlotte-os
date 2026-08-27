@@ -9,19 +9,20 @@
 //! - Ensuring that the interrupt service load is roughly balanced across all logical processors in
 //!   the system.
 
+use hashbrown::HashMap;
+
 use crate::cpu::isa::interface::interrupts::DynIhMapIfce;
 use crate::cpu::isa::interrupts::dynamic::DYN_IH_MAP;
 use crate::cpu::isa::lp::{IntSrcDscr, LpId, WiredIntCtlrId, WiredIntCtlrPinNum};
 use crate::cpu::isa::{self};
 use crate::device_management::drivers::busses::pci_express::topology::PcieLocation;
 use crate::device_management::drivers::busses::pci_express::{self};
-use crate::klib::collections::id_table::IdTable;
 
 pub type InterruptHandler = extern "C" fn();
 
 pub enum Error {
     InterruptVectorsExhausted,
-    InterruptRedirectionTableFull,
+    InterruptRedirectionEntriesExhausted,
     PcieError(pci_express::Error),
     IsaInterruptsError(isa::interrupts::Error),
 }
@@ -60,29 +61,35 @@ pub enum InterruptSource {
     PcieMsiX(PcieMsiXSource),
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct InterruptTarget {
-    lp_id:         LpId,
-    discriminator: IntSrcDscr,
+impl InterruptSource {
+    fn register_target(&self, target: InterruptTarget) -> Result<(), Error> {
+        todo!()
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
-struct InterruptRoute {
-    source: InterruptSource,
-    target: InterruptTarget,
+pub enum InterruptTarget {
+    Processor {
+        lp_id:         LpId,
+        discriminator: IntSrcDscr,
+    },
+    Remapper,
 }
 
 #[derive(Debug)]
 pub struct InterruptRoutingManager {
-    routes: IdTable<InterruptRoute>,
+    routes: HashMap<InterruptSource, InterruptTarget>,
 }
 
 impl InterruptRoutingManager {
-    pub fn register_external_interrupt(
+    pub fn create_int_req_route(
         &mut self,
         source: InterruptSource,
         handler: InterruptHandler,
     ) -> Result<InterruptTarget, Error> {
+        /* Install the interrupt handler with a suitable target */
+        let ih_map_lock = DYN_IH_MAP.write();
+        let target = ih_map_lock.find_available_target().ok_or(Error::InterruptVectorsExhausted)?;
         todo!()
     }
 }
