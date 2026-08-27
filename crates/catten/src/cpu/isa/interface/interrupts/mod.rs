@@ -1,12 +1,12 @@
 use crate::cpu::isa::interrupts::Error;
 use crate::cpu::isa::lp::{IntSrcDscr, LpId};
-use crate::device_management::interrupt_routing::InterruptHandler;
+use crate::device_management::interrupt_routing::{InterruptHandler, InterruptTarget};
 
 /// Dynamic Interrupt Dispatcher Interface
 pub trait DynIhMapIfce {
     /// Set the interrupt handler for a given logical processor and vector
     fn set_dyn_ih(
-        &self,
+        &mut self,
         lp: LpId,
         vector: IntSrcDscr,
         handler: InterruptHandler,
@@ -16,9 +16,9 @@ pub trait DynIhMapIfce {
     extern "C" fn get_local_dyn_ih(&self, vector: IntSrcDscr) -> Option<InterruptHandler>;
     /// Clear the assigned interrupt handler for a given logical processor and vector if there is
     /// one
-    fn clear_dyn_ih(&self, lp: LpId, vector: IntSrcDscr) -> Result<(), Error>;
+    fn clear_dyn_ih(&mut self, lp: LpId, vector: IntSrcDscr) -> Result<(), Error>;
     /// Find an available dynamic vector
-    fn find_available_vector(&self) -> Option<IntSrcDscr>;
+    fn find_available_target(&self) -> Option<InterruptTarget>;
 }
 
 /// Local Interrupt Controller Interface

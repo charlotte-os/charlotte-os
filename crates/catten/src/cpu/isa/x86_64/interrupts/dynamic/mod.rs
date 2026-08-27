@@ -12,12 +12,12 @@ use crate::cpu::isa::lp::ops::get_lp_id;
 use crate::cpu::isa::lp::{IntSrcDscr, LpId};
 use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::spin::rwlock::RwLock;
-use crate::device_management::interrupt_routing::InterruptHandler;
+use crate::device_management::interrupt_routing::{InterruptHandler, InterruptTarget};
 use crate::klib::collections::boxed_slice::make_boxed_slice;
 
 /// The instance of the dynamic interrupt handler matrix
 #[unsafe(no_mangle)]
-pub static DYN_IH_MAP: LazyLock<DynIhMap> = LazyLock::new(DynIhMap::new);
+pub static DYN_IH_MAP: LazyLock<RwLock<DynIhMap>> = LazyLock::new(|| RwLock::new(DynIhMap::new()));
 
 #[derive(Debug, Clone, Copy)]
 struct LpDynIhTable {
@@ -62,17 +62,17 @@ impl IndexMut<IntSrcDscr> for LpDynIhTable {
 /// interrupt handlers.
 #[derive(Debug)]
 pub struct DynIhMap {
-    map_table: RwLock<Box<[LpDynIhTable]>>,
+    map_table: Box<[LpDynIhTable]>,
 }
 
 impl DynIhMap {
     /// Creates a new dynamic interrupt handler map with all entries initialized to `None`.
     fn new() -> Self {
         Self {
-            map_table: RwLock::new(make_boxed_slice(get_lp_count() as usize, || LpDynIhTable {
+            map_table: make_boxed_slice(get_lp_count() as usize, || LpDynIhTable {
                 vectors_used: 0,
                 table:        [None; DYN_VECS_PER_LP as usize],
-            })),
+            }),
         }
     }
 
@@ -85,16 +85,14 @@ impl DynIhMap {
     /// that purpose.
     pub fn get_handler(&self, lp: LpId, vector: IntSrcDscr) -> Result<InterruptHandler, Error> {
         if core::hint::likely(Self::in_dyn_vec_range(vector)) {
-            self.map_table.read()[lp as usize]
-                .get_copied(vector)
-                .ok_or(Error::IntVecUnassigned(vector))
+            self.map_table[lp as usize].get_copied(vector).ok_or(Error::IntVecUnassigned(vector))
         } else {
             Err(Error::ArgIsFixedIntVec(vector))
         }
     }
 
     fn find_least_loaded_lp_idx(&self) -> usize {
-        let map_table = self.map_table.read();
+        let map_table = &self.map_table;
         map_table
             .iter()
             .enumerate()
@@ -106,7 +104,7 @@ impl DynIhMap {
 
 impl DynIhMapIfce for DynIhMap {
     fn set_dyn_ih(
-        &self,
+        &mut self,
         lp: LpId,
         vector: IntSrcDscr,
         handler: InterruptHandler,
@@ -116,7 +114,7 @@ impl DynIhMapIfce for DynIhMap {
         }
 
         let lp_index = lp as usize;
-        let mut lp_table = self.map_table.write()[lp_index];
+        let lp_table = &mut self.map_table[lp_index];
 
         if lp_table.get_mut(vector).is_none() {
             *lp_table.get_mut(vector) = Some(handler);
@@ -133,13 +131,13 @@ impl DynIhMapIfce for DynIhMap {
         }
     }
 
-    fn clear_dyn_ih(&self, lp: LpId, vector: IntSrcDscr) -> Result<(), Error> {
+    fn clear_dyn_ih(&mut self, lp: LpId, vector: IntSrcDscr) -> Result<(), Error> {
         if !Self::in_dyn_vec_range(vector) {
             return Err(Error::ArgIsFixedIntVec(vector));
         }
 
         let lp_index = lp as usize;
-        let mut lp_table = self.map_table.write()[lp_index];
+        let lp_table = &mut self.map_table[lp_index];
 
         if lp_table.get_mut(vector).is_some() {
             *lp_table.get_mut(vector) = None;
@@ -148,12 +146,15 @@ impl DynIhMapIfce for DynIhMap {
         Ok(())
     }
 
-    fn find_available_vector(&self) -> Option<IntSrcDscr> {
+    fn find_available_target(&self) -> Option<InterruptTarget> {
         let lp_idx = self.find_least_loaded_lp_idx();
-        let lp_table = self.map_table.read()[lp_idx];
+        let lp_table = &self.map_table[lp_idx];
         for i in DYN_VEC_START_OFFSET..(DYN_VEC_START_OFFSET + DYN_VECS_PER_LP) {
             if lp_table.get(i).is_none() {
-                return Some(i);
+                return Some(InterruptTarget::Processor {
+                    lp_id:         lp_idx as LpId,
+                    discriminator: i,
+                });
             }
         }
         None
