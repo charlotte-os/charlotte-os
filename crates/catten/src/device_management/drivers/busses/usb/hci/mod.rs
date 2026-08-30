@@ -1,6 +1,6 @@
 use alloc::sync::Arc;
 
-use crate::device_management::drivers::DeviceControlPlane;
+use crate::device_management::drivers::DeviceInterface;
 use crate::device_management::drivers::busses::BusControlPlane;
 use crate::device_management::drivers::endpoints::EndpointControlPlane;
 

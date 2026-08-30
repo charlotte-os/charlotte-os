@@ -29,6 +29,7 @@ pub mod klib;
 pub mod log;
 pub mod memory;
 pub mod panic;
+pub mod power_management;
 pub mod self_test;
 pub mod timers;
 
