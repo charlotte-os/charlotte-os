@@ -17,6 +17,8 @@
 //!   Flattened Device Tree (FDT) if they do not provide full UEFI and ACPI conformant firmware.
 //! - All ARM64 systems are expected to provide an ARM Trusted Firmware (ATF) and consequently a
 //!   Secure Monitor Call (SMC) interface.
+//! - All RISC-V systems are expected to provide an implementation of the Supervisor Binary
+//!   Interface (SBI) for necessary runtime firmware services.
 //! - x86_64 systems tend to provide firmware operating in System Management Mode (SMM) however the
 //!   interface to SMM interrupt calls is not standardized and thus must be accessed through ACPI.
 //!   As such we do not provide a separate module for SMM calls.
@@ -33,23 +35,25 @@ pub mod arm_smc;
 pub mod boot_protocol;
 #[cfg(all(not(target_arch = "x86_64"), feature = "devicetree"))]
 pub mod devicetree;
+#[cfg(target_arch = "riscv64")]
+pub mod riscv_sbi;
 // Unified Extensible Firmware Interface (UEFI) Runtime Services
 mod uefi_rts;
 
 pub fn get_pcie_segment_groups() -> Vec<PcieSegmentGroup> {
     cfg_select! {
         all(feature = "acpi", feature = "devicetree") => {
-            panic!(
-                "The Catten Kernel does not support compiling in both the acpi and devicetree
-            features as standards do not allow systems to expose both at the same time. Please 
-            recompile your kernel with only the one you actually intend to use."
+            compile_error!(
+                "The Catten Kernel does not support compiling in both the acpi and devicetree \
+                 features as standards do not allow systems to expose both at the same time. \
+                 Please recompile your kernel with only the one you actually intend to use."
             )
         }
         feature = "acpi" => acpi::sdt::mcfg::parse_mcfg(),
         feature = "devicetree" => {
             todo!("Develop a way to get the information for each PCIe segment from a Device Tree.")
         }
-        _ => panic!(
+        _ => compile_error!(
             "The Catten Kernel can not function without either the acpi or devicetree features \
              enabled at compile time."
         ),
