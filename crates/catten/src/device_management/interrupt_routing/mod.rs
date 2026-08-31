@@ -1,6 +1,6 @@
-//! # The Interrupt Routing Manager
+//! # The Interrupt Router
 //!
-//! The interrupt routing manager is responsible for the following:
+//! The interrupt router is responsible for the following:
 //! - Allocating and deallocating interrupt vectors to devices
 //! - Routing interrupts from devices to the appropriate interrupt vector
 //! - Managing interrupt redirection tables for both platform level interrupt controllers and
@@ -41,6 +41,7 @@ pub struct WiredSource {
     pub polarity:    bool,
     pub latched:     bool,
 }
+
 /// PCIe MSI source for an interrupt signal
 #[derive(Clone, Copy, Debug)]
 pub struct PcieMsiSource {
@@ -77,12 +78,12 @@ pub enum InterruptTarget {
 }
 
 #[derive(Debug)]
-pub struct InterruptRoutingManager {
+pub struct InterruptRouter {
     routes: HashMap<InterruptSource, InterruptTarget>,
 }
 
-impl InterruptRoutingManager {
-    pub fn create_int_req_route(
+impl InterruptRouter {
+    pub fn create_ext_int_route(
         &mut self,
         source: InterruptSource,
         handler: InterruptHandler,
