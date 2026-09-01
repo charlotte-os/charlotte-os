@@ -35,6 +35,7 @@ where
         + core::ops::BitAnd<Output = T>
         + Copy,
 {
+    // clear the bits in dest that are covered by the mask
     dest.bitand_assign(!mask);
     // set the bits in dest
     dest.bitor_assign((val << shift) & mask);
