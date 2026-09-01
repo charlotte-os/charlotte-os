@@ -37,21 +37,21 @@ impl From<isa::interrupts::Error> for Error {
 #[derive(Clone, Copy, Debug)]
 pub struct WiredSource {
     pub wired_ic_id: WiredIntCtlrId,
-    pub pin_num:     WiredIntCtlrPinNum,
-    pub polarity:    bool,
-    pub latched:     bool,
+    pub pin_num: WiredIntCtlrPinNum,
+    pub polarity: bool,
+    pub latched: bool,
 }
 
 /// PCIe MSI source for an interrupt signal
 #[derive(Clone, Copy, Debug)]
 pub struct PcieMsiSource {
     pub location: PcieLocation,
-    pub msi_num:  u32,
+    pub msi_num: u32,
 }
 /// PCIe MSI-X source for an interrupt signal
 #[derive(Clone, Copy, Debug)]
 pub struct PcieMsiXSource {
-    pub location:    PcieLocation,
+    pub location: PcieLocation,
     pub table_index: u32,
 }
 /// An enum representing the supported interrupt signal routing mechanisms
@@ -71,7 +71,7 @@ impl InterruptSource {
 #[derive(Clone, Copy, Debug)]
 pub enum InterruptTarget {
     Processor {
-        lp_id:         LpId,
+        lp_id: LpId,
         discriminator: IntSrcDscr,
     },
     Remapper,
