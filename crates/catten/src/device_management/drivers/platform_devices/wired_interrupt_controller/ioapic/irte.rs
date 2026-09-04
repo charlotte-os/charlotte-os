@@ -1,15 +1,17 @@
 //! # Interrupt Redirection Table Entry (IRTE)
 
-use crate::device_management::interrupt_routing::InterruptTarget;
 use crate::klib::bitwise::splice_into;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// IOxAPIC Interrupt Redirection Table Entry (IRTE)
 pub(super) struct Irte(u64);
 
 pub(super) enum DeliveryMode {
     Fixed = 0b000,
     LowestPriority = 0b001,
+    // System Management Interrupt (SMI)
     SMI = 0b010,
+    /// Non-Maskable Interrupt (NMI)
     NMI = 0b100,
     INIT = 0b101,
     ExtINT = 0b111,
@@ -64,22 +66,19 @@ impl Irte {
         splice_into(&mut self.0, mask_bit as u64, MASK_BIT_MASK, MASK_BIT_SHIFT).unwrap();
     }
 
-    fn set_dest_apic_id(&mut self, dest: IoapicDest) {
+    fn set_dest_apic_id(&mut self, dest: u8) {
         const DEST_APIC_ID_SHIFT: u8 = 56;
         const DEST_APIC_ID_MASK: u64 = 0x0f << DEST_APIC_ID_SHIFT;
-        splice_into(&mut self.0, dest.0 as u64, DEST_APIC_ID_MASK, DEST_APIC_ID_SHIFT).unwrap();
+        splice_into(&mut self.0, dest as u64, DEST_APIC_ID_MASK, DEST_APIC_ID_SHIFT).unwrap();
     }
-}
 
-#[repr(transparent)]
-pub(super) struct IoapicDest(u8);
+    pub(super) fn get_reg_vals(&self) -> (u32, u32) {
+        let low = self.0 as u32;
+        let high = (self.0 >> 32) as u32;
+        (low, high)
+    }
 
-impl IoapicDest {
-    fn try_new(apic_id: u8) -> Option<Self> {
-        if apic_id < 16 {
-            Some(Self(apic_id))
-        } else {
-            None
-        }
+    pub(super) fn from_reg_vals(low: u32, high: u32) -> Self {
+        Self(((high as u64) << 32) | (low as u64))
     }
 }
