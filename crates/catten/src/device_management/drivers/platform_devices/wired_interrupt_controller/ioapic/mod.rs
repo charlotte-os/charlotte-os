@@ -2,11 +2,7 @@ mod irte;
 
 use core::ptr::NonNull;
 
-use super::Error;
 use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
-use crate::cpu::multiprocessor::spin::mutex::Mutex;
-use crate::cpu::multiprocessor::spin::rwlock::RwLock;
-use crate::device_management::drivers::busses::pci_express::device_class::device_class::IOAPIC;
 use crate::klib::bitwise::mask_shift_read;
 use crate::memory::VirtualAddress;
 
@@ -21,6 +17,8 @@ pub struct IoapicDescriptor {
 }
 
 impl IoapicDescriptor {
+    const IRT_BASE_OFFSET: u32 = 0x10;
+
     /// Create a new IOAPIC descriptor from the given base address.
     ///
     /// # Safety
@@ -80,15 +78,32 @@ impl IoapicDescriptor {
         }
     }
 
-    fn signal_eoi(&mut self, vector: u8) {
-        const IOXAPIC_THRESHOLD_VERSION: u8 = 0x20;
-        if self.version >= IOXAPIC_THRESHOLD_VERSION {
-            let ioapic_eoi_reg_ptr = (self.base + 0x40usize).into_mut::<u32>();
-            unsafe {
-                ioapic_eoi_reg_ptr.write_volatile(vector as u32);
-            }
-        } else {
-            todo!("Use the trick Linux uses for signaling EOI on older IOAPIC versions")
-        }
+    // /// Signal End Of Interrupt (EOI) to the IOAPIC
+    // fn signal_eoi(&mut self, vector: u8) {
+    //     const IOXAPIC_THRESHOLD_VERSION: u8 = 0x20;
+    //     if self.version >= IOXAPIC_THRESHOLD_VERSION {
+    //         let ioapic_eoi_reg_ptr = (self.base + 0x40usize).into_mut::<u32>();
+    //         unsafe {
+    //             ioapic_eoi_reg_ptr.write_volatile(vector as u32);
+    //         }
+    //     } else {
+    //         todo!("Use the trick Linux uses for signaling EOI on older IOAPIC versions")
+    //     }
+    // }
+
+    pub fn set_irte(&mut self, index: u8, irte: irte::Irte) {
+        let low_offset = Self::IRT_BASE_OFFSET + (index as u32) * 2;
+        let high_offset = low_offset + 1;
+        let (reg_low, reg_high) = irte.get_reg_vals();
+        self.write_reg32(low_offset, reg_low);
+        self.write_reg32(high_offset, reg_high);
+    }
+
+    pub fn get_irte(&mut self, index: u8) -> irte::Irte {
+        let low_offset = Self::IRT_BASE_OFFSET + (index as u32) * 2;
+        let high_offset = low_offset + 1;
+        let reg_low = self.read_reg32(low_offset);
+        let reg_high = self.read_reg32(high_offset);
+        irte::Irte::from_reg_vals(reg_low, reg_high)
     }
 }
