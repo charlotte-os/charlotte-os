@@ -9,6 +9,11 @@
 //! - Ensuring that the interrupt service load is roughly balanced across all logical processors in
 //!   the system.
 
+#[cfg(feature = "acpi")]
+pub mod gsi_mapping;
+#[cfg(target_arch = "x86_64")]
+pub mod legacy_irqs;
+
 use hashbrown::HashMap;
 
 use crate::cpu::isa::interface::interrupts::DynIhMapIfce;

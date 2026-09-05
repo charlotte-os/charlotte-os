@@ -7,28 +7,40 @@ use alloc::vec::Vec;
 use core::ptr::NonNull;
 
 use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
-use crate::environment::acpi::SdtHeader;
 use crate::environment::acpi::sdt::madt::entry_types::MadtEntryType;
+use crate::environment::acpi::table_map::AcpiTableHeader;
 use crate::memory::VirtualAddress;
 
 type GlobalSystemInterrupt = u32;
 
+const NUM_ENTRY_TYPES: usize = 28usize;
+
+pub struct MadtEntryIndex {
+    ptr_matrix: [Vec<NonNull<MadtEntryGeneric>>; NUM_ENTRY_TYPES],
+}
+
+impl MadtEntryIndex {
+    fn get_type(&self, entry_type: MadtEntryType) -> &Vec<NonNull<MadtEntryGeneric>> {
+        &self.ptr_matrix[entry_type as usize]
+    }
+}
+
 #[derive(Debug)]
 #[repr(C, packed)]
 struct MadtEntryGeneric {
-    entry_type:   u8,
+    entry_type: u8,
     entry_length: u8,
 }
 
 struct MadtEntryIter {
-    ptr:     Option<NonNull<MadtEntryGeneric>>,
+    ptr: Option<NonNull<MadtEntryGeneric>>,
     end_ptr: VirtualAddress,
 }
 
 impl MadtEntryIter {
     pub fn new(madt_ptr: *const Madt) -> Self {
         Self {
-            ptr:     unsafe {
+            ptr: unsafe {
                 NonNull::new((madt_ptr as *const u8).add(core::mem::size_of::<Madt>())
                     as *mut MadtEntryGeneric)
             },
@@ -57,24 +69,12 @@ impl Iterator for MadtEntryIter {
     }
 }
 
-const NUM_ENTRY_TYPES: usize = 28usize;
-
-pub struct MadtEntryIndex {
-    ptr_matrix: [Vec<NonNull<MadtEntryGeneric>>; NUM_ENTRY_TYPES],
-}
-
-impl MadtEntryIndex {
-    fn get_type(&self, entry_type: MadtEntryType) -> &Vec<NonNull<MadtEntryGeneric>> {
-        &self.ptr_matrix[entry_type as usize]
-    }
-}
-
 #[derive(Debug)]
 #[repr(C, packed)]
 pub struct Madt {
-    header:        SdtHeader,
+    header: AcpiTableHeader,
     lapic_address: u32,
-    flags:         u32,
+    flags: u32,
 }
 
 impl Madt {
