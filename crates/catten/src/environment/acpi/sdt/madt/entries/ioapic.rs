@@ -9,11 +9,11 @@ type IoApicId = u8;
 #[derive(Debug)]
 #[repr(C, packed)]
 pub struct IoApicEntry {
-    entry_type:                   MadtEntryType,
-    length:                       u8,
-    ioapic_id:                    IoApicId,
-    reserved:                     u8,
-    ioapic_address:               u32,
+    entry_type: MadtEntryType,
+    length: u8,
+    ioapic_id: IoApicId,
+    reserved: u8,
+    ioapic_address: u32,
     global_system_interrupt_base: GlobalSystemInterrupt,
 }
 

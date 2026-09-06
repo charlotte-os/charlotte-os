@@ -1,23 +1,27 @@
+pub(super) mod interrupt_flags;
 pub(super) mod interrupt_source_override;
 pub(super) mod ioapic;
 pub(super) mod local_x2apic_nmi;
 pub(super) mod nmi_source;
-pub(super) mod interrupt_flags;
 
-use spin::LazyLock;
-use crate::environment::acpi::table_map::AcpiTableType;
-use crate::memory::physical::PhysicalAddressIfce;
 use alloc::vec::Vec;
 use core::ptr::NonNull;
 
+use spin::LazyLock;
+
 use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
-use crate::environment::acpi::table_map::{AcpiTableHeader, find_table_type};
+use crate::environment::acpi::table_map::{AcpiTableHeader, AcpiTableType, find_table_type};
 use crate::memory::VirtualAddress;
+use crate::memory::physical::PhysicalAddressIfce;
 
 pub(super) static MADT_INDEX: LazyLock<MadtEntryIndex> = LazyLock::new(|| {
-    let madt_paddrs = find_table_type(AcpiTableType::MADT).expect("[ACPI] PANIC: No MADT tables found on this ACPI based system.");
+    let madt_paddrs = find_table_type(AcpiTableType::MADT)
+        .expect("[ACPI] PANIC: No MADT tables found on this ACPI based system.");
     if madt_paddrs.len() > 1 {
-        panic!("[ACPI] Warning: Multiple MADT tables found. Defaulting to using the first one though this may be incorrect.");
+        panic!(
+            "[ACPI] Warning: Multiple MADT tables found. Defaulting to using the first one though \
+             this may be incorrect."
+        );
     }
     unsafe { madt_paddrs[0].into_hhdm_ptr::<Madt>().as_ref_unchecked() }.parse()
 });
@@ -29,14 +33,17 @@ pub struct MadtEntryIndex {
 }
 
 impl MadtEntryIndex {
-    pub(super) fn get_entries_with_type(&self, entry_type: MadtEntryType) -> &Vec<&'static MadtEntryGeneric> {
+    pub(super) fn get_entries_with_type(
+        &self,
+        entry_type: MadtEntryType,
+    ) -> &Vec<&'static MadtEntryGeneric> {
         &self.ptr_matrix[entry_type as usize]
     }
 }
 
 #[derive(Debug)]
 #[repr(C, packed)]
-struct MadtEntryGeneric {
+pub(super) struct MadtEntryGeneric {
     entry_type: u8,
     entry_length: u8,
     // ...rest of the entry based on the specific type
@@ -127,7 +134,8 @@ pub enum MadtEntryType {
     GicMsiFrame = 0xd,
     GicRedistributor = 0xe,
     GicInterruptTranslationService = 0xf,
-    /* The Limine MP feature is always used on all UEFI/ACPI platforms so this entry type is never used. */
+    /* The Limine MP feature is always used on all UEFI/ACPI platforms so this entry type is
+     * never used. */
     _MultiprocessorWakeup = 0x10,
     /* The following seven entry types are never used by this kernel. */
     _CoreProgrammableInterruptController = 0x11,
