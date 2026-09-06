@@ -6,7 +6,7 @@ use crate::device_management::interrupt_routing;
 pub enum Error {
     InvalidSource,
     InvalidTarget,
-    IdOutOfRange
+    IdOutOfRange,
 }
 
 pub trait WiredIntCtlr {

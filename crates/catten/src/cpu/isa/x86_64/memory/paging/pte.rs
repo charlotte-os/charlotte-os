@@ -181,8 +181,8 @@ impl PageTableEntry {
     }
 
     pub fn set_frame(&mut self, frame: PhysicalAddress) -> &mut Self {
-        self.0 =
-            (self.0 & !*FRAME_ADDR_MASK) | ((<PhysicalAddress as Into<u64>>::into(frame)) & *FRAME_ADDR_MASK);
+        self.0 = (self.0 & !*FRAME_ADDR_MASK)
+            | ((<PhysicalAddress as Into<u64>>::into(frame)) & *FRAME_ADDR_MASK);
         self
     }
 

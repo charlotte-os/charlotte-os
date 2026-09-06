@@ -7,8 +7,8 @@ use crate::environment::acpi::sdt::madt::entries::interrupt_flags::InterruptFlag
 #[derive(Debug, PartialEq, Eq)]
 #[repr(C, packed)]
 pub struct NmiSourceEntry {
-    entry_type:              MadtEntryType,
-    length:                  u8,
-    flags:                   InterruptFlags,
+    entry_type: MadtEntryType,
+    length: u8,
+    flags: InterruptFlags,
     global_system_interrupt: GlobalSystemInterrupt,
 }

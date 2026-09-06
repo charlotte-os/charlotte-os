@@ -73,9 +73,9 @@ impl Deref for PcieFunctionNum {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PcieLocation {
     segment_group: PcieSegmentGroupNum,
-    bus_segment:   PcieBusSegmentNum,
-    device:        PcieDeviceNum,
-    function:      PcieFunctionNum,
+    bus_segment: PcieBusSegmentNum,
+    device: PcieDeviceNum,
+    function: PcieFunctionNum,
 }
 
 impl PcieLocation {
@@ -148,15 +148,15 @@ impl PcieTopology {
 #[derive(Debug)]
 pub struct PcieSegmentGroup {
     pcie_segment_group_num: PcieSegmentGroupNum,
-    ecam_vaddr:             VirtualAddress, /* Virtual address where this segment's ECAM is
-                                             * mapped in the
-                                             * kernel's address space */
-    start_bus_num:          PcieBusSegmentNum,
-    end_bus_num:            PcieBusSegmentNum,
-    root_bus:               Box<PcieBusSegment>, /* Root bus of this segment's topology; the
-                                                  * rest of the
-                                                  * topology
-                                                  * can be traversed from here */
+    ecam_vaddr: VirtualAddress, /* Virtual address where this segment's ECAM is
+                                 * mapped in the
+                                 * kernel's address space */
+    start_bus_num: PcieBusSegmentNum,
+    end_bus_num: PcieBusSegmentNum,
+    root_bus: Box<PcieBusSegment>, /* Root bus of this segment's topology; the
+                                    * rest of the
+                                    * topology
+                                    * can be traversed from here */
 }
 
 impl PcieSegmentGroup {
@@ -183,7 +183,7 @@ impl PcieSegmentGroup {
 
 #[derive(Debug)]
 pub struct PcieBusSegment {
-    number:  PcieBusSegmentNum,
+    number: PcieBusSegmentNum,
     devices: [PcieDevice; MAX_DEVICES_PER_BUS],
 }
 
@@ -263,7 +263,7 @@ impl PcieDevice {
 
 #[derive(Debug)]
 pub struct PcieSingleFuncDevice {
-    number:   PcieDeviceNum,
+    number: PcieDeviceNum,
     function: PcieFunction,
 }
 
@@ -275,7 +275,7 @@ impl PcieSingleFuncDevice {
         device_num: u8,
     ) -> Self {
         PcieSingleFuncDevice {
-            number:   PcieDeviceNum(device_num),
+            number: PcieDeviceNum(device_num),
             function: PcieFunction::new(
                 ecam_vaddr,
                 segment_group_num,
@@ -289,7 +289,7 @@ impl PcieSingleFuncDevice {
 
 #[derive(Debug)]
 pub struct PcieMultiFuncDevice {
-    number:    PcieDeviceNum,
+    number: PcieDeviceNum,
     functions: [PcieFunction; MAX_FUNCTIONS_PER_DEVICE],
 }
 
@@ -391,13 +391,13 @@ impl PcieFunction {
 
 #[derive(Debug)]
 pub struct PcieEndpoint {
-    number:     PcieFunctionNum,
+    number: PcieFunctionNum,
     identifier: PciIdentifier,
     /* Raw pointer to this function's configuration space in the kernel's address space;
      * used for reading/writing config space registers inside this PCIe bus driver ONLY
      * other drivers and the rest of the kernel should use safe functions exposed by this bus
      * driver */
-    cfg_ptr:    SpinMutex<NonNull<PcieCfgSpace>>,
+    cfg_ptr: SpinMutex<NonNull<PcieCfgSpace>>,
 }
 
 impl PcieEndpoint {

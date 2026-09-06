@@ -7,7 +7,7 @@
 
 use core::ptr::NonNull;
 
-use super::{is_pagetable_unused, PAGE_SIZE};
+use super::{PAGE_SIZE, is_pagetable_unused};
 use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface};
 use crate::cpu::isa::x86_64::memory::address::paddr::PhysicalAddress;
@@ -50,7 +50,9 @@ impl<'vas> PthWalker<'vas> {
     }
 
     fn root_table_ptr(&self) -> *mut super::PageTable {
-        PhysicalAddress::try_from((self.address_space.cr3 & CR3_ADDRESS_MASK) as usize).unwrap().into()
+        PhysicalAddress::try_from((self.address_space.cr3 & CR3_ADDRESS_MASK) as usize)
+            .unwrap()
+            .into()
     }
 
     fn walk_next_level(
@@ -120,7 +122,8 @@ impl<'vas> PthWalker<'vas> {
             // higher half memory.
             if self.address_space.cr3 & CR3_ADDRESS_MASK == 0 {
                 let new_pml4 = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame().unwrap();
-                self.address_space.cr3 = <PhysicalAddress as Into<u64>>::into(new_pml4) & CR3_ADDRESS_MASK;
+                self.address_space.cr3 =
+                    <PhysicalAddress as Into<u64>>::into(new_pml4) & CR3_ADDRESS_MASK;
                 self.address_space.load().expect("Error reloading the CR3 register");
             }
             self.pml4_ptr = self.root_table_ptr();

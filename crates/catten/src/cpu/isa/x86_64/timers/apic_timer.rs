@@ -36,7 +36,7 @@ pub enum ApicTimerDivisors {
 
 #[derive(Clone, Debug)]
 pub struct ApicTimer {
-    resolution:  ExtDuration,
+    resolution: ExtDuration,
     reset_value: <Self as LpTimerIfce>::TickCount,
 }
 
@@ -77,7 +77,7 @@ impl ApicTimer {
 
     pub fn new(interrupt_vector: <ApicTimer as LpTimerIfce>::IntDispatchNum) -> Self {
         let mut t = ApicTimer {
-            resolution:  ExtDuration::from_secs(0),
+            resolution: ExtDuration::from_secs(0),
             reset_value: 0,
         };
         t.determine_timer_resolution();

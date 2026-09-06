@@ -33,8 +33,8 @@ impl Deref for Waitlist {
 
 #[derive(Default)]
 pub struct RwLockCore {
-    raw_lock:           AtomicI64,
-    waitlist_shared:    Waitlist,
+    raw_lock: AtomicI64,
+    waitlist_shared: Waitlist,
     waitlist_exclusive: Waitlist,
 }
 
@@ -68,8 +68,8 @@ unsafe impl RawRwLock for RwLockCore {
     type GuardMarker = lock_api::GuardNoSend;
 
     const INIT: Self = Self {
-        raw_lock:           AtomicI64::new(0),
-        waitlist_shared:    Waitlist(ConcurrentQueue::unbounded()),
+        raw_lock: AtomicI64::new(0),
+        waitlist_shared: Waitlist(ConcurrentQueue::unbounded()),
         waitlist_exclusive: Waitlist(ConcurrentQueue::unbounded()),
     };
 

@@ -58,8 +58,8 @@ impl From<allocators::memory::Error> for Error {
 #[derive(Debug)]
 pub struct StackBuf {
     raw_buf_start: VirtualAddress,
-    size:          usize,
-    pub curr_sp:   VirtualAddress,
+    size: usize,
+    pub curr_sp: VirtualAddress,
 }
 
 impl StackBuf {
@@ -120,8 +120,8 @@ impl StackBuf {
     unsafe fn shallow_clone(&self) -> Self {
         Self {
             raw_buf_start: self.raw_buf_start,
-            size:          self.size,
-            curr_sp:       self.initial_sp(),
+            size: self.size,
+            curr_sp: self.initial_sp(),
         }
     }
 }

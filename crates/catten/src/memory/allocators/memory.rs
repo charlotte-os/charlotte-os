@@ -46,8 +46,8 @@ pub fn try_allocate_and_map_range(
     num_pages: usize,
 ) -> Result<(), Error> {
     let mut mapping = MemoryMapping {
-        vaddr:     VirtualAddress::default(),
-        paddr:     PhysicalAddress::default(),
+        vaddr: VirtualAddress::default(),
+        paddr: PhysicalAddress::default(),
         page_type: PageType::KernelData,
     };
     let alloc_func = match page_size {

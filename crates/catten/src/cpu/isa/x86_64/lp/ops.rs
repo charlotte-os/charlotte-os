@@ -85,10 +85,7 @@ pub fn get_lic_id() -> u32 {
     apic_id
 }
 
-use core::arch::{
-    asm,
-    naked_asm,
-};
+use core::arch::{asm, naked_asm};
 
 use super::LpId;
 use crate::cpu::isa::constants::*;
@@ -120,14 +117,10 @@ pub fn get_lp_id() -> LpId {
     id as crate::cpu::isa::lp::LpId
 }
 
-use crate::{
-    cpu::scheduler::{
-        system_scheduler::SYSTEM_SCHEDULER,
-        threads::MASTER_THREAD_TABLE,
-    },
-    logln,
-    memory::VirtualAddress,
-};
+use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
+use crate::cpu::scheduler::threads::MASTER_THREAD_TABLE;
+use crate::logln;
+use crate::memory::VirtualAddress;
 
 #[inline]
 pub extern "C" fn get_lp_local_base() -> VirtualAddress {

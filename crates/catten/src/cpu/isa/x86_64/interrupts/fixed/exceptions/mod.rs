@@ -141,7 +141,11 @@ extern "C" fn ih_stack_segment_fault() {
 }
 
 #[unsafe(no_mangle)]
-extern "C" fn ih_general_protection_fault(error_code: u64, fault_addr: VirtualAddress, rax_val: u64) {
+extern "C" fn ih_general_protection_fault(
+    error_code: u64,
+    fault_addr: VirtualAddress,
+    rax_val: u64,
+) {
     panic!(
         "General protection fault occurred at virtual address=0x{fault_addr:x?} with error \
          code=0x{error_code:x}, and RAX=0x{rax_val:x}."

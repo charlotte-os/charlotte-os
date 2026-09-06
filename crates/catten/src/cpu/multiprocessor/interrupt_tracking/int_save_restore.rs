@@ -10,8 +10,8 @@ use crate::cpu::multiprocessor::get_lp_count;
 pub static INT_STATE: LazyLock<IntState> = LazyLock::new(|| IntState::new());
 
 pub struct IntState {
-    raw_locks:      Vec<AtomicBool>,
-    save_counts:    Vec<usize>,
+    raw_locks: Vec<AtomicBool>,
+    save_counts: Vec<usize>,
     saved_int_bits: Vec<bool>,
 }
 
@@ -19,8 +19,8 @@ impl IntState {
     pub fn new() -> Self {
         let num_cpus = get_lp_count() as usize;
         Self {
-            raw_locks:      (0..num_cpus).map(|_| AtomicBool::default()).collect(),
-            save_counts:    vec![0; num_cpus],
+            raw_locks: (0..num_cpus).map(|_| AtomicBool::default()).collect(),
+            save_counts: vec![0; num_cpus],
             saved_int_bits: vec![false; num_cpus],
         }
     }

@@ -45,8 +45,8 @@ impl From<PhysicalAddressError> for Error {
 
 #[derive(Debug)]
 pub struct PhysicalFrameAllocator {
-    bitmap_ptr:     *mut u8,
-    bitmap_len:     usize,
+    bitmap_ptr: *mut u8,
+    bitmap_len: usize,
     next_free_hint: usize,
 }
 
@@ -273,8 +273,8 @@ impl From<&MemmapResponse> for PhysicalFrameAllocator {
         let bitmap_addr: PhysicalAddress = find_mmap_best_fit(response, bitmap_size).unwrap();
         early_logln!("PhysicalFrameAllocator bitmap addr (physical): {:?}", bitmap_addr);
         let pfa = PhysicalFrameAllocator {
-            bitmap_ptr:     unsafe { bitmap_addr.into_hhdm_mut::<u8>() },
-            bitmap_len:     bitmap_size,
+            bitmap_ptr: unsafe { bitmap_addr.into_hhdm_mut::<u8>() },
+            bitmap_len: bitmap_size,
             next_free_hint: 0,
         };
         // Initially mark all frames as unavailable.

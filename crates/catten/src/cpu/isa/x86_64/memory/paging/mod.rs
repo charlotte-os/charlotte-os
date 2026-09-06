@@ -1,30 +1,16 @@
 pub mod pte;
 pub mod pth_walker;
-use core::{
-    arch::asm,
-    iter::Iterator,
-    ptr::NonNull,
-};
+use core::arch::asm;
+use core::iter::Iterator;
+use core::ptr::NonNull;
 
-use super::{
-    MemoryInterfaceImpl,
-    address::vaddr::VirtualAddress,
-};
-use crate::{
-    cpu::isa::interface::memory::{
-        AddressSpaceInterface,
-        MemoryInterface,
-        MemoryMapping,
-        address::Address,
-    },
-    klib::size::{
-        gibibytes,
-        kibibytes,
-        mebibytes,
-    },
-    logln,
-    memory::PhysicalAddress,
-};
+use super::MemoryInterfaceImpl;
+use super::address::vaddr::VirtualAddress;
+use crate::cpu::isa::interface::memory::address::Address;
+use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface, MemoryMapping};
+use crate::klib::size::{gibibytes, kibibytes, mebibytes};
+use crate::logln;
+use crate::memory::PhysicalAddress;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]

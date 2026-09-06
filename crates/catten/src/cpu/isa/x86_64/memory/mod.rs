@@ -3,13 +3,9 @@ pub mod paging;
 pub mod tlb;
 
 pub use crate::cpu::isa::interface::memory::MemoryInterface;
-use crate::{
-    cpu::isa::memory::address::paddr::PhysicalAddressError,
-    memory::{
-        linear::Error as VMemError,
-        physical::Error as PMemError,
-    },
-};
+use crate::cpu::isa::memory::address::paddr::PhysicalAddressError;
+use crate::memory::linear::Error as VMemError;
+use crate::memory::physical::Error as PMemError;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Error {

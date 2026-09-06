@@ -1,7 +1,5 @@
-use core::{
-    arch::asm,
-    mem::size_of,
-};
+use core::arch::asm;
+use core::mem::size_of;
 
 use crate::get_lp_id;
 

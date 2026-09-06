@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 
 pub struct VecQueue<T: Clone> {
-    vec:  Vec<T>,
+    vec: Vec<T>,
     head: usize,
     tail: usize,
 }
@@ -9,7 +9,7 @@ pub struct VecQueue<T: Clone> {
 impl<T: Clone> VecQueue<T> {
     pub fn new() -> Self {
         VecQueue {
-            vec:  Vec::<T>::new(),
+            vec: Vec::<T>::new(),
             head: 0,
             tail: 0,
         }

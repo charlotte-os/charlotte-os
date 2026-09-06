@@ -7,10 +7,7 @@ pub mod ioapic;
 pub mod x2apic;
 
 use idt::*;
-use spin::{
-    LazyLock,
-    Mutex,
-};
+use spin::{LazyLock, Mutex};
 
 use crate::memory::IdTable;
 

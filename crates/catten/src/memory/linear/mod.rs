@@ -65,7 +65,7 @@ impl PageType {
 }
 #[derive(Debug, Clone)]
 pub struct MemoryMapping {
-    pub vaddr:     VirtualAddress,
-    pub paddr:     PhysicalAddress,
+    pub vaddr: VirtualAddress,
+    pub paddr: PhysicalAddress,
     pub page_type: PageType,
 }

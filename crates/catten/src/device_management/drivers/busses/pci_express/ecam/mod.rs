@@ -38,8 +38,8 @@ pub(super) fn map_ecam(base: PhysicalAddress) -> VirtualAddress {
     let mut mem_mapping: MemoryMapping;
     for offset in (0..ECAM_SIZE).step_by(mebibytes(2)) {
         mem_mapping = MemoryMapping {
-            vaddr:     vbase + offset,
-            paddr:     base + offset,
+            vaddr: vbase + offset,
+            paddr: base + offset,
             page_type: crate::memory::linear::PageType::Mmio,
         };
         kas.map_large_page(mem_mapping).expect("Failed to map large page for a PCIe ECAM!");

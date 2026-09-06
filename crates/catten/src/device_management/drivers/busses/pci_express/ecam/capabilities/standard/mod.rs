@@ -23,7 +23,7 @@ pub type PciCapabilityOffset = u8;
 /// casted to the appropriate capability type once the header `id` field has been read.
 #[repr(C, packed)]
 pub struct PciCapabilityHeader {
-    pub id:   PciCapabilityId,
+    pub id: PciCapabilityId,
     pub next: PciCapabilityOffset,
 }
 
@@ -31,9 +31,9 @@ pub struct PciCapabilityHeader {
 /// It traverses the linked list of capabilities starting from the first capability offset.
 /// Keeps track of seen offsets to avoid infinite loops in case of malformed lists.
 struct PciCapabilityIter {
-    cfg_space:      *const PcieCfgSpace,
+    cfg_space: *const PcieCfgSpace,
     current_offset: PciCapabilityOffset,
-    seen_offsets:   Vec<PciCapabilityOffset>,
+    seen_offsets: Vec<PciCapabilityOffset>,
 }
 
 impl PciCapabilityIter {

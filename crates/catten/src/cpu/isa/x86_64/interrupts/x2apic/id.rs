@@ -11,7 +11,7 @@ pub(super) static X2APIC_ID_TABLE: Mutex<BTreeMap<LpId, LapicId>> = Mutex::new(B
 #[repr(C, packed)]
 pub struct LapicId {
     pub physical: PhysicalLapicId,
-    pub logical:  LogicalLapicId,
+    pub logical: LogicalLapicId,
 }
 
 impl LapicId {
