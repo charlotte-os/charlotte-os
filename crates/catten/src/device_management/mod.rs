@@ -12,5 +12,5 @@ use drivers::endpoints::*;
 
 pub struct DeviceControlPlaneTable {
     pub pcie_root_complex: Vec<pci_express::topology::PcieSegmentGroup>,
-    pub uart:              Vec<Arc<dyn uart::Uart>>,
+    pub uart: Vec<Arc<dyn uart::Uart>>,
 }

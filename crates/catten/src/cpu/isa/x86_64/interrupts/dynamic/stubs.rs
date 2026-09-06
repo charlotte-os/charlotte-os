@@ -1,10 +1,8 @@
 use core::arch::global_asm;
 
-use crate::cpu::isa::{
-    constants::interrupt_vectors::DYN_VEC_START_OFFSET,
-    init::gdt,
-    interrupts::idt::Idt,
-};
+use crate::cpu::isa::constants::interrupt_vectors::DYN_VEC_START_OFFSET;
+use crate::cpu::isa::init::gdt;
+use crate::cpu::isa::interrupts::idt::Idt;
 
 global_asm!(include_str!("dyn_isrs.asm"));
 

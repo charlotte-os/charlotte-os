@@ -31,8 +31,8 @@ pub fn test_vmem() {
     logln!("Creating MemoryMapping struct.");
     let higher_half_start: VirtualAddress = VirtualAddress::from(0xffff_ffff_ffff_f000usize);
     let mapping = MemoryMapping {
-        vaddr:     higher_half_start,
-        paddr:     frame,
+        vaddr: higher_half_start,
+        paddr: frame,
         page_type: PageType::KernelData,
     };
     logln!(

@@ -36,13 +36,13 @@ impl Ord for ThreadHandle {
 
 #[derive(Debug)]
 pub struct RoundRobin {
-    lp_id:                LpId,
-    quantum:              ExtDuration,
-    is_idle:              bool,
+    lp_id: LpId,
+    quantum: ExtDuration,
+    is_idle: bool,
     timer_event_observer: Arc<super::TimerEventObserver>,
-    run_queue:            VecDeque<ThreadHandle>,
-    current_handle:       Option<ThreadHandle>,
-    hwasid_map:           HashMap<AddressSpaceId, HwAsid>,
+    run_queue: VecDeque<ThreadHandle>,
+    current_handle: Option<ThreadHandle>,
+    hwasid_map: HashMap<AddressSpaceId, HwAsid>,
 }
 
 impl RoundRobin {

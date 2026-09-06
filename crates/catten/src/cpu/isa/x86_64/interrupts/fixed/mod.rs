@@ -5,16 +5,14 @@ pub mod ipis;
 pub mod spurious;
 pub mod timer;
 
-use crate::cpu::isa::{
-    constants::interrupt_vectors::{
-        ASYNC_IPI_VECTOR,
-        LAPIC_TIMER_VECTOR,
-        SPURIOUS_INTERRUPT_VECTOR_NUM,
-        SYNC_IPI_VECTOR,
-    },
-    init::gdt::KERNEL_CODE_SELECTOR,
-    interrupts::idt::Idt,
+use crate::cpu::isa::constants::interrupt_vectors::{
+    ASYNC_IPI_VECTOR,
+    LAPIC_TIMER_VECTOR,
+    SPURIOUS_INTERRUPT_VECTOR_NUM,
+    SYNC_IPI_VECTOR,
 };
+use crate::cpu::isa::init::gdt::KERNEL_CODE_SELECTOR;
+use crate::cpu::isa::interrupts::idt::Idt;
 
 pub fn register_fixed_isr_gates(idt: &mut Idt) {
     exceptions::set_gates(idt);

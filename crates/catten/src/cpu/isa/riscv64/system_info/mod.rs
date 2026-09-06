@@ -29,7 +29,7 @@ type Riscv64Vendor = u64;
 #[derive(Debug)]
 pub struct Riscv64Model {
     marchid: u64,
-    mimpid:  u64,
+    mimpid: u64,
 }
 
 pub struct Riscv64CpuInfo;
@@ -67,7 +67,7 @@ impl CpuInfoIfce for Riscv64CpuInfo {
                 0
             )
             .value,
-            mimpid:  call_sbi!(
+            mimpid: call_sbi!(
                 SbiExtensionId::Base as i32,
                 SbiBaseFunctionId::GetMachineImplId as i32,
                 0,

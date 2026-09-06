@@ -1,8 +1,6 @@
 use super::Error;
-use crate::{
-    cpu::isa::lp::LpId,
-    klib::bitwise::mask_shift_read,
-};
+use crate::cpu::isa::lp::LpId;
+use crate::klib::bitwise::mask_shift_read;
 
 const VECTOR_SHIFT: u8 = 0;
 const VECTOR_MASK: u64 = 0xffu64 << VECTOR_SHIFT;

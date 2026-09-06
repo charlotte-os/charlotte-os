@@ -53,7 +53,7 @@ impl PcieExtCapVerOffset {
 
 #[repr(C, packed)]
 pub struct PcieExtCapabilityHeader {
-    pub id:       PcieExtCapId,
+    pub id: PcieExtCapId,
     pub next_ver: PcieExtCapVerOffset,
 }
 
@@ -62,9 +62,9 @@ pub struct PcieExtCapabilityHeader {
 /// (PCIE_EXT_CAP_RANGE_BASE). Keeps track of seen offsets to avoid infinite loops in case of
 /// malformed lists.
 struct PcieExtCapIter {
-    cfg_space:      *const PcieCfgSpace,
+    cfg_space: *const PcieCfgSpace,
     current_offset: PcieExtCapVerOffset,
-    seen_offsets:   Vec<PcieExtCapVerOffset>,
+    seen_offsets: Vec<PcieExtCapVerOffset>,
 }
 
 impl PcieExtCapIter {

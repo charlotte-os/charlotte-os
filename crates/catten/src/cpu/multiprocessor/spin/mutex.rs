@@ -13,14 +13,14 @@ pub type Mutex<T> = lock_api::Mutex<MutexCore, T>;
 /// used for any other purpose.
 #[derive(Debug)]
 pub struct MutexCore {
-    state:                AtomicBool,
+    state: AtomicBool,
     saved_interrupt_flag: AtomicBool,
 }
 
 impl MutexCore {
     pub const fn new() -> Self {
         Self {
-            state:                AtomicBool::new(false),
+            state: AtomicBool::new(false),
             saved_interrupt_flag: AtomicBool::new(false),
         }
     }

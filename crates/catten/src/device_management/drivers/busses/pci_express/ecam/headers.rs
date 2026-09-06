@@ -7,18 +7,18 @@ use crate::device_management::drivers::busses::pci_express::ecam::capabilities::
 /// The Common portion of the PCIe configuration space header; shared by both endpoint and bridge
 /// devices
 pub struct CfgCommonHeader {
-    vendor_id:       u16,
-    device_id:       u16,
-    command:         u16,
-    status:          u16,
-    revision_id:     u8,
-    prog_if:         u8,
-    subclass:        u8,
-    class_code:      u8,
+    vendor_id: u16,
+    device_id: u16,
+    command: u16,
+    status: u16,
+    revision_id: u8,
+    prog_if: u8,
+    subclass: u8,
+    class_code: u8,
     cache_line_size: u8,
-    latency_timer:   u8,
-    header_type:     u8,
-    bist:            u8,
+    latency_timer: u8,
+    header_type: u8,
+    bist: u8,
 }
 
 impl CfgCommonHeader {
@@ -41,11 +41,11 @@ impl CfgCommonHeader {
 
     pub fn get_identifier(&self) -> PciIdentifier {
         PciIdentifier {
-            vendor_id:  self.vendor_id,
-            device_id:  self.device_id,
+            vendor_id: self.vendor_id,
+            device_id: self.device_id,
             class_code: self.class_code,
-            subclass:   self.subclass,
-            prog_if:    self.prog_if,
+            subclass: self.subclass,
+            prog_if: self.prog_if,
         }
     }
 
@@ -61,28 +61,28 @@ impl CfgCommonHeader {
 /// The configuration space header for PCIe bridge devices, which extends the common header with
 /// bridge-specific fields
 pub struct CfgBridgeHeader {
-    common:                     CfgCommonHeader,
-    bars:                       [u32; 2],
-    primary_bus_num:            u8,
-    secondary_bus_num:          u8,
-    subordinate_bus_num:        u8,
-    secondary_latency_timer:    u8,
-    io_base:                    u8,
-    io_limit:                   u8,
-    secondary_status:           u16,
-    memory_base:                u16,
-    memory_limit:               u16,
-    prefetchable_memory_base:   u16,
-    prefetchable_memory_limit:  u16,
-    prefetchable_base_upper32:  u32,
+    common: CfgCommonHeader,
+    bars: [u32; 2],
+    primary_bus_num: u8,
+    secondary_bus_num: u8,
+    subordinate_bus_num: u8,
+    secondary_latency_timer: u8,
+    io_base: u8,
+    io_limit: u8,
+    secondary_status: u16,
+    memory_base: u16,
+    memory_limit: u16,
+    prefetchable_memory_base: u16,
+    prefetchable_memory_limit: u16,
+    prefetchable_base_upper32: u32,
     prefetchable_limit_upper32: u32,
-    io_base_upper16:            u16,
-    io_limit_upper16:           u16,
-    capabilities_offset:        u8,
-    unused0:                    [u8; 7],
-    interrupt_line:             u8,
-    interrupt_pin:              u8,
-    bridge_control:             u16,
+    io_base_upper16: u16,
+    io_limit_upper16: u16,
+    capabilities_offset: u8,
+    unused0: [u8; 7],
+    interrupt_line: u8,
+    interrupt_pin: u8,
+    bridge_control: u16,
 }
 
 impl CfgBridgeHeader {
@@ -110,18 +110,18 @@ impl CfgBridgeHeader {
 /// The configuration space header for PCIe endpoint devices, which extends the common header with
 /// endpoint-specific fields
 pub struct CfgEndpointHeader {
-    common:                  CfgCommonHeader,
-    bars:                    [u32; 6],
-    _cardbus_cis_ptr:        u32,
-    subsystem_vendor_id:     u16,
-    subsystem_id:            u16,
+    common: CfgCommonHeader,
+    bars: [u32; 6],
+    _cardbus_cis_ptr: u32,
+    subsystem_vendor_id: u16,
+    subsystem_id: u16,
     expansion_rom_base_addr: u32,
-    capabilities_offset:     u8,
-    _unused0:                [u8; 7],
-    interrupt_line:          u8,
-    interrupt_pin:           u8,
-    _min_grant:              u8,
-    _max_latency:            u8,
+    capabilities_offset: u8,
+    _unused0: [u8; 7],
+    interrupt_line: u8,
+    interrupt_pin: u8,
+    _min_grant: u8,
+    _max_latency: u8,
 }
 
 impl CfgEndpointHeader {
@@ -136,8 +136,8 @@ impl CfgEndpointHeader {
 
 /// The configuration space header for a PCIe device, which can be either a bridge or an endpoint
 pub union CfgHeader {
-    pub common:   ManuallyDrop<CfgCommonHeader>, /* For determining header type before safely
-                                                  * accessing bridge/endpoint-specific fields */
-    pub bridge:   ManuallyDrop<CfgBridgeHeader>,
+    pub common: ManuallyDrop<CfgCommonHeader>, /* For determining header type before safely
+                                                * accessing bridge/endpoint-specific fields */
+    pub bridge: ManuallyDrop<CfgBridgeHeader>,
     pub endpoint: ManuallyDrop<CfgEndpointHeader>,
 }

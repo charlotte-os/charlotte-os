@@ -22,7 +22,7 @@ pub static DYN_IH_MAP: LazyLock<RwLock<DynIhMap>> = LazyLock::new(|| RwLock::new
 #[derive(Debug, Clone, Copy)]
 struct LpDynIhTable {
     vectors_used: u8,
-    table:        [Option<InterruptHandler>; DYN_VECS_PER_LP as usize],
+    table: [Option<InterruptHandler>; DYN_VECS_PER_LP as usize],
 }
 
 impl LpDynIhTable {
@@ -71,7 +71,7 @@ impl DynIhMap {
         Self {
             map_table: make_boxed_slice(get_lp_count() as usize, || LpDynIhTable {
                 vectors_used: 0,
-                table:        [None; DYN_VECS_PER_LP as usize],
+                table: [None; DYN_VECS_PER_LP as usize],
             }),
         }
     }
@@ -152,7 +152,7 @@ impl DynIhMapIfce for DynIhMap {
         for i in DYN_VEC_START_OFFSET..(DYN_VEC_START_OFFSET + DYN_VECS_PER_LP) {
             if lp_table.get(i).is_none() {
                 return Some(InterruptTarget::Processor {
-                    lp_id:         lp_idx as LpId,
+                    lp_id: lp_idx as LpId,
                     discriminator: i,
                 });
             }

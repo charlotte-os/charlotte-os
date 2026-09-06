@@ -2,29 +2,12 @@ mod redirection_table_entry;
 
 use redirection_table_entry::*;
 
-use crate::{
-    cpu::{
-        isa::{
-            constants::interrupt_vectors::SPURIOUS_INTERRUPT_VECTOR_NUM,
-            interface::interrupts::ExternalInterruptControllerIfce,
-            io::{
-                IReg32Ifce,
-                IoReg32,
-                OReg32Ifce,
-            },
-            lp::{
-                IntSrcDscr,
-                LpId,
-            },
-        },
-        multiprocessor::get_lp_count,
-    },
-    klib::bitwise::{
-        mask_from_len,
-        mask_shift_read,
-        splice_into,
-    },
-};
+use crate::cpu::isa::constants::interrupt_vectors::SPURIOUS_INTERRUPT_VECTOR_NUM;
+use crate::cpu::isa::interface::interrupts::ExternalInterruptControllerIfce;
+use crate::cpu::isa::io::{IReg32Ifce, IoReg32, OReg32Ifce};
+use crate::cpu::isa::lp::{IntSrcDscr, LpId};
+use crate::cpu::multiprocessor::get_lp_count;
+use crate::klib::bitwise::{mask_from_len, mask_shift_read, splice_into};
 
 /* The bitwise left shifts of various values within their containing registers */
 const IOAPIC_ID_SHIFT: u8 = 24;

@@ -1,33 +1,20 @@
 //! # x2APIC Local Advanced Programmable Interrupt Controller
 mod id;
 
-use core::{
-    arch::asm,
-    mem::MaybeUninit,
-};
+use core::arch::asm;
+use core::mem::MaybeUninit;
 
 use spin::LazyLock;
 
 use super::super::constants::interrupt_vectors::*;
-use crate::{
-    cpu::{
-        isa::{
-            interface::{
-                interrupts::LocalIntCtlrIfce,
-                timers::LpTimerIfce,
-            },
-            interrupts::Error,
-            lp::{
-                IntSrcDscr,
-                LpId,
-            },
-            timers::apic_timer::ApicTimer,
-            x86_64::constants::msrs,
-        },
-        multiprocessor::spin::per_lp::PerLp,
-    },
-    get_lp_id,
-};
+use crate::cpu::isa::interface::interrupts::LocalIntCtlrIfce;
+use crate::cpu::isa::interface::timers::LpTimerIfce;
+use crate::cpu::isa::interrupts::Error;
+use crate::cpu::isa::lp::{IntSrcDscr, LpId};
+use crate::cpu::isa::timers::apic_timer::ApicTimer;
+use crate::cpu::isa::x86_64::constants::msrs;
+use crate::cpu::multiprocessor::spin::per_lp::PerLp;
+use crate::get_lp_id;
 
 pub static LAPICS: LazyLock<PerLp<MaybeUninit<X2Apic>>> =
     LazyLock::new(|| PerLp::new(|| MaybeUninit::uninit()));

@@ -1,39 +1,15 @@
-use core::mem::{
-    offset_of,
-    transmute,
-};
+use core::mem::{offset_of, transmute};
 
 const INIT_KERNEL_STACK_PAGES: usize = 16;
 
-use crate::{
-    cpu::isa::{
-        constants::rflags,
-        init::gdt::{
-            USER_CODE_SELECTOR,
-            USER_DATA_SELECTOR,
-        },
-        interface::memory::address::{
-            Address,
-            VirtualAddressIfce,
-        },
-        lp::ops::{
-            kernel_thread_trampoline,
-            user_trampoline,
-        },
-        memory::paging::PAGE_SIZE,
-    },
-    klib::collections::id_table,
-    memory::{
-        ADDRESS_SPACE_TABLE,
-        AddressSpaceId,
-        KERNEL_AS,
-        VirtualAddress,
-        allocators::stack_allocator::{
-            self,
-            *,
-        },
-    },
-};
+use crate::cpu::isa::constants::rflags;
+use crate::cpu::isa::init::gdt::{USER_CODE_SELECTOR, USER_DATA_SELECTOR};
+use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
+use crate::cpu::isa::lp::ops::{kernel_thread_trampoline, user_trampoline};
+use crate::cpu::isa::memory::paging::PAGE_SIZE;
+use crate::klib::collections::id_table;
+use crate::memory::allocators::stack_allocator::{self, *};
+use crate::memory::{ADDRESS_SPACE_TABLE, AddressSpaceId, KERNEL_AS, VirtualAddress};
 
 /// `iretq` stack frame structure for x86_64 architecture to be used with `switch_ctx` and then
 /// return to the userspace entry thunk to properly enter userspace at the entry point.
