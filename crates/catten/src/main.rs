@@ -85,7 +85,7 @@ pub extern "C" fn bsp_main() -> ! {
     print_timer_info();
     cfg_select! {
         feature = "acpi" => {
-            environment::acpi::print_table_map();
+            environment::acpi::table_map::print_table_map();
         }
     }
     mask_interrupts!();

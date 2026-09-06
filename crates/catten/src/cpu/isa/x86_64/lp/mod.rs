@@ -6,5 +6,5 @@ pub type LpId = u32;
 pub type CoreId = u32;
 
 pub type WiredIntCtlrId = u8;
-pub type WiredIntCtlrPinNum = u8;
+pub type WiredIntCtlrSrcNum = u8;
 pub type IntSrcDscr = u8;

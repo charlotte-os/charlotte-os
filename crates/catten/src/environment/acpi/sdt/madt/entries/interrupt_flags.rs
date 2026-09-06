@@ -14,7 +14,7 @@ pub enum InterruptPolarity {
 
 #[derive(Debug, PartialEq, Eq)]
 #[repr(u16)]
-pub enum InterruptTrigger {
+pub enum InterruptTriggerMode {
     BusSpec = 0b00,
     Edge = 0b01,
     Reserved = 0b10,
@@ -26,7 +26,7 @@ pub enum InterruptTrigger {
 /// Ref: ACPI 6.6 Section 5.2.12.5
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub(super) struct InterruptFlags(u16);
+pub struct InterruptFlags(u16);
 
 impl InterruptFlags {
     pub fn polarity(&self) -> InterruptPolarity {
@@ -39,12 +39,12 @@ impl InterruptFlags {
         }
     }
 
-    pub fn trigger(&self) -> InterruptTrigger {
+    pub fn trigger_mode(&self) -> InterruptTriggerMode {
         match (self.0 & FLAGS_TRIGGER_MASK) >> FLAGS_TRIGGER_SHIFT {
-            0b00 => InterruptTrigger::BusSpec,
-            0b01 => InterruptTrigger::Edge,
-            0b10 => InterruptTrigger::Reserved,
-            0b11 => InterruptTrigger::Level,
+            0b00 => InterruptTriggerMode::BusSpec,
+            0b01 => InterruptTriggerMode::Edge,
+            0b10 => InterruptTriggerMode::Reserved,
+            0b11 => InterruptTriggerMode::Level,
             _ => unreachable!(),
         }
     }

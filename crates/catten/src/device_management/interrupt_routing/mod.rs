@@ -9,16 +9,11 @@
 //! - Ensuring that the interrupt service load is roughly balanced across all logical processors in
 //!   the system.
 
-#[cfg(feature = "acpi")]
-pub mod gsi_mapping;
-#[cfg(target_arch = "x86_64")]
-pub mod legacy_irqs;
-
 use hashbrown::HashMap;
 
 use crate::cpu::isa::interface::interrupts::DynIhMapIfce;
 use crate::cpu::isa::interrupts::dynamic::DYN_IH_MAP;
-use crate::cpu::isa::lp::{IntSrcDscr, LpId, WiredIntCtlrId, WiredIntCtlrPinNum};
+use crate::cpu::isa::lp::{IntSrcDscr, LpId, WiredIntCtlrId, WiredIntCtlrSrcNum};
 use crate::cpu::isa::{self};
 use crate::device_management::drivers::busses::pci_express::topology::PcieLocation;
 use crate::device_management::drivers::busses::pci_express::{self};
@@ -42,7 +37,7 @@ impl From<isa::interrupts::Error> for Error {
 #[derive(Clone, Copy, Debug)]
 pub struct WiredSource {
     pub wired_ic_id: WiredIntCtlrId,
-    pub pin_num: WiredIntCtlrPinNum,
+    pub source_num: WiredIntCtlrSrcNum,
     pub polarity: bool,
     pub latched: bool,
 }
