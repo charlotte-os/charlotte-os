@@ -1,5 +1,5 @@
 use crate::environment::acpi::sdt::madt::GlobalSystemInterrupt;
-use crate::environment::acpi::sdt::madt::entry_types::MadtEntryType;
+use crate::environment::acpi::sdt::madt::entries::MadtEntryType;
 use crate::memory::PhysicalAddress;
 
 type IoApicId = u8;
