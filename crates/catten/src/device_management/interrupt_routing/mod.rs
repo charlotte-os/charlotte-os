@@ -9,6 +9,8 @@
 //! - Ensuring that the interrupt service load is roughly balanced across all logical processors in
 //!   the system.
 
+pub mod legacy_irqs;
+
 use hashbrown::HashMap;
 
 use crate::cpu::isa::interface::interrupts::DynIhMapIfce;
