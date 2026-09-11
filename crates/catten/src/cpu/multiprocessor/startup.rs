@@ -1,3 +1,5 @@
+// Only the x86-64 startup path inspects the x2APIC flag; Limine does not define it elsewhere.
+#[cfg(target_arch = "x86_64")]
 use limine::mp::MP_FLAG_X2APIC;
 use spin::{LazyLock, RwLock};
 

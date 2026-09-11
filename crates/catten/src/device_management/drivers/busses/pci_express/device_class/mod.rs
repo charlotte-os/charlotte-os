@@ -99,6 +99,9 @@ impl Into<HwDeviceIfce> for PciIdentifier {
             (_, _, device_class::USB_EHCI) => HwDeviceIfce::EhciUsbHostController,
             (_, _, device_class::USB_XHCI) => HwDeviceIfce::XhciUsbHostController,
             (_, _, device_class::USB4_ROUTER) => HwDeviceIfce::Usb4Router,
+            // The SMBus host controller is modelled as an x86-64 platform component, so this
+            // mapping only exists where that variant does.
+            #[cfg(target_arch = "x86_64")]
             (_, _, device_class::SMBUS_CONTROLLER) => HwDeviceIfce::SmBusController,
             (_, _, device_class::IPMI_KCS) => HwDeviceIfce::IpmiKcs,
 

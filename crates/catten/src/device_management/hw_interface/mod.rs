@@ -37,6 +37,7 @@ pub enum HwDeviceIfce {
     IpmiKcs,
     // Graphics and Display
     AmdGpu,
+    ArmGpu,
     IntelGpu,
     NvidiaGpu,
     UefiGopFramebuffer,
@@ -107,6 +108,7 @@ impl core::fmt::Display for HwDeviceIfce {
             }
             HwDeviceIfce::IpmiKcs => "IPMI KCS Interface",
             HwDeviceIfce::AmdGpu => "AMD VGA Compatible Device, Model Unknown",
+            HwDeviceIfce::ArmGpu => "Arm VGA Compatible Device, Model Unknown",
             HwDeviceIfce::IntelGpu => "Intel VGA Compatible Device, Model Unknown",
             HwDeviceIfce::NvidiaGpu => "Nvidia VGA Compatible Device, Model Unknown",
             HwDeviceIfce::UefiGopFramebuffer => "UEFI Graphics Output Protocol (GOP) Framebuffer",

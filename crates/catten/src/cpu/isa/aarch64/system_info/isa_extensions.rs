@@ -19,7 +19,7 @@ pub(in crate::cpu::isa::aarch64::system_info) mod check_feat {
     //! ARM has a lot of different extensions and checking them is done using a bunch different
     //! system registers. Make sure to consult the ARM Architecture Reference Manual (ARM ARM) when
     //! making any changes in this module.
-    use crate::common::bitwise::*;
+    use crate::klib::bitwise::*;
 
     // ARM ARM D24.2.85
     pub fn d128() -> bool {

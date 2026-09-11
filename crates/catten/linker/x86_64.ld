@@ -33,6 +33,15 @@ SECTIONS
         *(.rodata .rodata.*)
     } :rodata
 
+    /* Limine locates its requests by scanning the executable for their magic numbers, so they
+       must be KEPT even though no kernel code necessarily references them. The start and end
+       markers bracket the block and have to stay on either side of it. */
+    .requests : {
+        KEEP(*(.requests_start_marker))
+        KEEP(*(.requests))
+        KEEP(*(.requests_end_marker))
+    } :rodata
+
     /* Move to the next memory page for .data */
     . += CONSTANT(MAXPAGESIZE);
 

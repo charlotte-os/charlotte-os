@@ -60,6 +60,8 @@ create-image arch="x86_64" profile="debug" features="": (build-catten arch profi
 vm_memory := "512M"
 vm_num_lps := "8"
 usb_image_path := "./test_data/disk_images/test-usb.img"
+# Padded, writable copies of the EDK2 riscv64 firmware; see qemu-run-riscv64.
+riscv_fw_dir := image_dir / "riscv64-firmware"
 
 qemu-run-x86_64 profile="debug" features="qemu" gdb="false": (create-image "x86_64" profile features)
     qemu-system-x86_64 \
@@ -71,7 +73,7 @@ qemu-run-x86_64 profile="debug" features="qemu" gdb="false": (create-image "x86_
         -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/ovmf/OVMF_CODE.fd \
         -boot d \
         -vga none \
-        -device virtio-vga,xres=3840,yres=2160 \
+        -device virtio-vga,xres=2560,yres=1440 \
         -drive file={{image_dir}}/charlotte-x86_64-{{profile}}.img,format=raw,if=none,id=nvme0 \
         -device nvme,drive=nvme0,serial=catten00 \
         -nic none \
@@ -87,7 +89,7 @@ qemu-run-x86_64 profile="debug" features="qemu" gdb="false": (create-image "x86_
 
 qemu-run-aarch64 profile="debug" gdb="false": (create-image "aarch64" profile)
     qemu-system-aarch64 \
-        -M virt \
+        -M virt,iommu=smmuv3 \
         -cpu cortex-a710 \
         -smp {{vm_num_lps}} \
         -m {{vm_memory}} \
@@ -97,25 +99,42 @@ qemu-run-aarch64 profile="debug" gdb="false": (create-image "aarch64" profile)
         -device qemu-xhci,id=xhci \
         -device usb-kbd,bus=xhci.0 \
         -device usb-mouse,bus=xhci.0 \
+        -netdev user,id=usbnet0 \
         -device usb-net,netdev=usbnet0,bus=xhci.0 \
-        -device arm-smmu \
         -drive file={{image_dir}}/charlotte-aarch64-{{profile}}.img,format=raw \
         -device usb-storage,bus=xhci.0,drive=usbdrive0 \
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
         {{ if gdb == "true" {"-s -S"} else {""} }}
 
 qemu-run-riscv64 profile="debug" gdb="false": (create-image "riscv64" profile)
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # The riscv64 virt machine has two fixed 32 MiB flash slots, but EDK2 ships its firmware at
+    # its natural size, so pad a copy of each to fit. The varstore also has to be writable, which
+    # rules out pointing QEMU straight at the read-only files under /usr/share.
+    mkdir -p {{riscv_fw_dir}}
+    code="{{riscv_fw_dir}}/RISCV_VIRT_CODE.fd"
+    vars="{{riscv_fw_dir}}/RISCV_VIRT_VARS.fd"
+    for fw in CODE VARS; do
+        dest="{{riscv_fw_dir}}/RISCV_VIRT_${fw}.fd"
+        if [[ ! -f "$dest" ]]; then
+            cp "/usr/share/edk2/riscv/RISCV_VIRT_${fw}.fd" "$dest"
+            truncate -s 32M "$dest"
+        fi
+    done
     qemu-system-riscv64 \
         -M virt \
         -cpu tt-ascalon \
         -smp {{vm_num_lps}} \
         -m {{vm_memory}} \
-        -bios /usr/share/edk2/riscv64/QEMU_EFI.fd \
+        -drive if=pflash,unit=0,format=raw,readonly=on,file="$code" \
+        -drive if=pflash,unit=1,format=raw,file="$vars" \
         -boot d \
         -device ramfb \
         -device qemu-xhci,id=xhci \
         -device usb-kbd,bus=xhci.0 \
         -device usb-mouse,bus=xhci.0 \
+        -netdev user,id=usbnet0 \
         -device usb-net,netdev=usbnet0,bus=xhci.0 \
         -device riscv-iommu-pci \
         -drive file={{image_dir}}/charlotte-riscv64-{{profile}}.img,format=raw \
