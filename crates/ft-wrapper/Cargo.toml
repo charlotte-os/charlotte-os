@@ -1,0 +1,27 @@
+[package]
+name = "ft-wrapper"
+version = "0.1.0"
+edition = "2024"
+description = "Freestanding Rust bindings to the vendored Flanterm terminal emulator"
+# The vendored C sources under vendor/flanterm are BSD-2-Clause; this crate's own
+# code follows the rest of the workspace.
+license = "AGPL-3.0-or-later"
+links = "flanterm"
+build = "build.rs"
+
+[lib]
+name = "ft_wrapper"
+path = "src/lib.rs"
+test = false
+bench = false
+
+[features]
+default = []
+# Keep Flanterm's built-in bump allocator, which costs ~873 KiB of .bss. It is
+# only ever used when a null malloc/free pair is handed to flanterm_fb_init, so
+# callers that supply their own allocator do not need it.
+bump-alloc = []
+
+[build-dependencies]
+bindgen = { version = ">=0.72.1" }
+cc = { version = ">=1.4.4" }

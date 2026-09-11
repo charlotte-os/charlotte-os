@@ -31,9 +31,9 @@ pub(super) static TABLE_MAP: LazyLock<HashMap<AcpiTableType, Vec<PhysicalAddress
 
 pub fn print_table_map() {
     let mut output = String::new();
-    output.push_str("ACPI Table Map:\n");
+    output.push_str("ACPI Table Map:\r\n");
     for (table_type, addrs) in TABLE_MAP.iter() {
-        output.push_str(&format!("{:?}: {:?}\n", table_type, addrs));
+        output.push_str(&format!("{:?}: {:?}\r\n", table_type, addrs));
     }
     logln!("{output}");
 }

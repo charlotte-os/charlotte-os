@@ -451,9 +451,9 @@ impl core::fmt::Display for PcieTopology {
 impl PcieSegmentGroup {
     fn fmt_tree(&self, f: &mut core::fmt::Formatter<'_>, indent: usize) -> core::fmt::Result {
         let ecam: u64 = self.ecam_vaddr.into();
-        writeln!(
+        write!(
             f,
-            "{:indent$}Segment Group {} (ECAM @ {:#018x}, buses {:#04x}-{:#04x})",
+            "{:indent$}Segment Group {} (ECAM @ {:#018x}, buses {:#04x}-{:#04x})\r\n",
             "",
             self.pcie_segment_group_num,
             ecam,
@@ -467,14 +467,14 @@ impl PcieSegmentGroup {
 
 impl PcieBusSegment {
     fn fmt_tree(&self, f: &mut core::fmt::Formatter<'_>, indent: usize) -> core::fmt::Result {
-        writeln!(f, "{:indent$}Bus {:#04x}", "", self.number, indent = indent)?;
+        write!(f, "{:indent$}Bus {:#04x}\r\n", "", self.number, indent = indent)?;
         let child_indent = indent + TREE_INDENT_STEP;
         // Label the columns directly above the rows they describe (column widths must match the
         // formatting in `PcieFunction::fmt_tree`). Skipped for buses with no occupied slots.
         if self.devices.iter().any(|device| !matches!(device, PcieDevice::Empty)) {
-            writeln!(
+            write!(
                 f,
-                "{:indent$}{:<7}  {:<9}  {}",
+                "{:indent$}{:<7}  {:<9}  {}\r\n",
                 "",
                 "B:D.F",
                 "VID:DID",
@@ -525,9 +525,9 @@ impl PcieFunction {
     ) -> core::fmt::Result {
         match self {
             PcieFunction::Empty => Ok(()),
-            PcieFunction::Endpoint(endpoint) => writeln!(
+            PcieFunction::Endpoint(endpoint) => write!(
                 f,
-                "{:indent$}{:02x}:{:02x}.{:x}  {}",
+                "{:indent$}{:02x}:{:02x}.{:x}  {}\r\n",
                 "",
                 bus,
                 device,
@@ -536,9 +536,9 @@ impl PcieFunction {
                 indent = indent
             ),
             PcieFunction::Bridge(secondary_bus) => {
-                writeln!(
+                write!(
                     f,
-                    "{:indent$}{:02x}:{:02x}.{:x}  PCI-to-PCI bridge -> bus {:#04x}",
+                    "{:indent$}{:02x}:{:02x}.{:x}  PCI-to-PCI bridge -> bus {:#04x}\r\n",
                     "",
                     bus,
                     device,

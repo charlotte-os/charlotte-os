@@ -36,23 +36,15 @@ jobs:
         profile: [debug, release]
         platform:
           - arch: x86_64
-            clang-target: x86_64-unknown-none-elf
-            cflags: -mcmodel=kernel
           - arch: aarch64
-            clang-target: aarch64-unknown-none-elf
-            cflags: ''
           - arch: riscv64
-            clang-target: riscv64-unknown-none-elf
-            cflags: -march=rv64gc -mabi=lp64d -mcmodel=medany
     env:
       CARGO_TERM_COLOR: always
       BUILD_ARCH: ${{ matrix.platform.arch }}
       BUILD_PROFILE: ${{ matrix.profile }}
-      # flanterm compiles C and generates bindings while cross-compiling.
-      CC: clang
-      AR: llvm-ar
-      TARGET_CFLAGS: --target=${{ matrix.platform.clang-target }} -ffreestanding ${{ matrix.platform.cflags }}
-      BINDGEN_EXTRA_CLANG_ARGS: --target=${{ matrix.platform.clang-target }} -ffreestanding ${{ matrix.platform.cflags }}
+      # ft-wrapper compiles Flanterm's C sources and runs bindgen over its headers while
+      # cross-compiling; its build script picks the clang target triple and C flags per
+      # architecture, so nothing needs to be pinned here.
 
     steps:
       - name: Install Fedora build and image tools

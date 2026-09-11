@@ -3,8 +3,6 @@ json-target-spec = true
 build-std = ["core", "alloc", "compiler_builtins"]
 build-std-features = ["compiler-builtins-mem"]
 
-[env]
-# Tell clang/cc and bindgen to use a real clang triple instead of our custom one,
-# since clang doesn't know about the 'catten' environment component.
-CFLAGS_x86_64-unknown-none-catten = "-ffreestanding -mcmodel=kernel"
-BINDGEN_EXTRA_CLANG_ARGS_x86_64-unknown-none-catten = "--target=x86_64-unknown-none-elf -ffreestanding -mcmodel=kernel"
+# clang knows nothing about the 'catten' environment component in our custom target triples, so
+# ft-wrapper's build script maps each architecture onto a bare-metal ELF triple and derives the
+# matching C flags itself. Nothing needs to be set here for that to work.

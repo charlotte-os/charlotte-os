@@ -7,6 +7,6 @@ use crate::logln;
 
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
-    logln!("***\nA kernel panic has occurred with the following cause:\n{}\n***", _info);
+    logln!("***\r\nA kernel panic has occurred with the following cause:\r\n{}\r\n***", _info);
     await_interrupt!();
 }

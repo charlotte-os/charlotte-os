@@ -82,7 +82,7 @@ impl Display for Model {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "Part Number: {:#06x}\nRevision: {}\nVariant: {}\nArchitecture: {:#x}\n",
+            "Part Number: {:#06x}\r\nRevision: {}\r\nVariant: {}\r\nArchitecture: {:#x}\r\n",
             self.part_num, self.revision, self.variant, self.architecture
         )
     }
