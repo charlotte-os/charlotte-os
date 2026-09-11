@@ -1,0 +1,107 @@
+name: Build OS images
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.platform.arch }} (${{ matrix.profile }})
+    # GitHub supplies the host VM; all build commands run in Fedora.
+    runs-on: ubuntu-24.04
+    container:
+      image: registry.fedoraproject.org/fedora:44
+      # create-image uses loop devices and mounts the EFI system partition.
+      options: --privileged
+      volumes:
+        # Share device nodes created by the host when losetup scans partitions.
+        - /dev:/dev
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      # Keep attempting every platform even when another one fails to compile.
+      fail-fast: false
+      matrix:
+        profile: [debug, release]
+        platform:
+          - arch: x86_64
+            clang-target: x86_64-unknown-none-elf
+            cflags: -mcmodel=kernel
+          - arch: aarch64
+            clang-target: aarch64-unknown-none-elf
+            cflags: ''
+          - arch: riscv64
+            clang-target: riscv64-unknown-none-elf
+            cflags: -march=rv64gc -mabi=lp64d -mcmodel=medany
+    env:
+      CARGO_TERM_COLOR: always
+      BUILD_ARCH: ${{ matrix.platform.arch }}
+      BUILD_PROFILE: ${{ matrix.profile }}
+      # flanterm compiles C and generates bindings while cross-compiling.
+      CC: clang
+      AR: llvm-ar
+      TARGET_CFLAGS: --target=${{ matrix.platform.clang-target }} -ffreestanding ${{ matrix.platform.cflags }}
+      BINDGEN_EXTRA_CLANG_ARGS: --target=${{ matrix.platform.clang-target }} -ffreestanding ${{ matrix.platform.cflags }}
+
+    steps:
+      - name: Install Fedora build and image tools
+        # Install git before checkout so it does not fall back to archive download.
+        run: |
+          dnf install --assumeyes --setopt=install_weak_deps=False \
+            git just rustup gcc clang clang-libs llvm \
+            tar gzip parted dosfstools util-linux sudo
+
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install the repository's Rust toolchain
+        # rustup reads rust-toolchain.toml; build-std needs the Rust sources.
+        run: |
+          rustup-init -y --no-modify-path --profile minimal --default-toolchain none
+          source "$HOME/.cargo/env"
+          printf '%s\n' "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          rustup show
+          rustup component add rust-src
+          rustc --version
+          cargo --version
+
+      - name: Build kernel
+        id: kernel
+        run: just build-catten "$BUILD_ARCH" "$BUILD_PROFILE"
+
+      - name: Create OS image
+        id: image
+        run: just --no-deps create-image "$BUILD_ARCH" "$BUILD_PROFILE"
+
+      - name: Upload OS image
+        uses: actions/upload-artifact@v7
+        with:
+          name: charlotte-${{ matrix.platform.arch }}-${{ matrix.profile }}-${{ github.sha }}
+          path: os-images/charlotte-${{ matrix.platform.arch }}-${{ matrix.profile }}.img
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Summarize build results
+        if: always()
+        env:
+          KERNEL_RESULT: ${{ steps.kernel.outcome }}
+          IMAGE_RESULT: ${{ steps.image.outcome }}
+        run: |
+          {
+            printf '### %s (%s)\n\n' "$BUILD_ARCH" "$BUILD_PROFILE"
+            printf '| Stage | Result |\n| --- | --- |\n'
+            printf '| Kernel compilation | %s |\n' "$KERNEL_RESULT"
+            printf '| Image creation | %s |\n' "$IMAGE_RESULT"
+          } >> "$GITHUB_STEP_SUMMARY"

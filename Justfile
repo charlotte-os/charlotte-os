@@ -7,25 +7,55 @@ build-catten-docs arch="x86_64" profile="debug" features="":
     "" {"--features " + features} else {""} }} --no-deps --open
 
 image_dir := "./os-images"
-temp_mnt_dir := "~/temp-mnt"
 create-image arch="x86_64" profile="debug" features="": (build-catten arch profile features)
     #!/usr/bin/env bash
-    if [ ! -d {{image_dir}} ]; then mkdir {{image_dir}}; fi
-    touch {{image_dir}}/charlotte-{{arch}}-{{profile}}.img
-    dd if=/dev/zero of={{image_dir}}/charlotte-{{arch}}-{{profile}}.img bs=4K count=1048576
-    parted -s {{image_dir}}/charlotte-{{arch}}-{{profile}}.img mklabel gpt
-    parted -s {{image_dir}}/charlotte-{{arch}}-{{profile}}.img mkpart ESP fat32 1MiB 100%
-    parted -s {{image_dir}}/charlotte-{{arch}}-{{profile}}.img set 1 esp on
-    lodev=$(sudo losetup -fP --show {{image_dir}}/charlotte-{{arch}}-{{profile}}.img)
-    sudo mkfs.fat -F32 ${lodev}p1
-    if [ ! -d {{temp_mnt_dir}} ]; then mkdir {{temp_mnt_dir}}; fi
-    sudo mount ${lodev}p1 {{temp_mnt_dir}}
-    sudo mkdir -p {{temp_mnt_dir}}/EFI/BOOT
-    sudo cp ./limine-binary/BOOTX64.EFI {{temp_mnt_dir}}/EFI/BOOT/BOOTX64.EFI
-    sudo cp ./target/{{ if arch == "x86_64" { "x86_64-unknown-none-catten" } else if arch == "aarch64" { "aarch64-unknown-none-catten" } else if arch == "riscv64" { "riscv64gc-unknown-none-catten" } else { arch + "-unknown-none" } }}/{{profile}}/catten ./limine.conf {{temp_mnt_dir}}
-    sudo umount {{temp_mnt_dir}}
-    sudo losetup -d $lodev
-    rm -r {{temp_mnt_dir}}
+    set -euo pipefail
+    case "{{arch}}" in
+        x86_64) bootloader="BOOTX64.EFI" ;;
+        aarch64) bootloader="BOOTAA64.EFI" ;;
+        riscv64) bootloader="BOOTRISCV64.EFI" ;;
+        *) printf 'Unsupported image architecture: %s\n' "{{arch}}" >&2; exit 1 ;;
+    esac
+    image_path="{{image_dir}}/charlotte-{{arch}}-{{profile}}.img"
+    mount_dir=""
+    lodev=""
+    cleanup() {
+        local status=$?
+        local cleanup_status=0
+        trap - EXIT
+        if [[ -n "$mount_dir" ]] && mountpoint -q "$mount_dir"; then
+            if ! sudo umount "$mount_dir"; then
+                # Leave the device attached if its filesystem is still mounted.
+                if (( status == 0 )); then status=1; fi
+                exit "$status"
+            fi
+        fi
+        if [[ -n "$lodev" ]]; then
+            sudo losetup -d "$lodev" || cleanup_status=1
+        fi
+        if [[ -n "$mount_dir" ]]; then
+            rmdir "$mount_dir" || cleanup_status=1
+        fi
+        if (( status == 0 )); then status=$cleanup_status; fi
+        exit "$status"
+    }
+    trap cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    mkdir -p "{{image_dir}}"
+    # Reset existing data before creating a sparse, zero-filled 4 GiB image.
+    truncate -s 0 "$image_path"
+    truncate -s 4G "$image_path"
+    parted -s "$image_path" mklabel gpt
+    parted -s "$image_path" mkpart ESP fat32 1MiB 100%
+    parted -s "$image_path" set 1 esp on
+    lodev=$(sudo losetup -fP --show "$image_path")
+    sudo mkfs.fat -F32 "${lodev}p1"
+    mount_dir=$(mktemp -d)
+    sudo mount "${lodev}p1" "$mount_dir"
+    sudo mkdir -p "$mount_dir/EFI/BOOT"
+    sudo cp "./limine-binary/$bootloader" "$mount_dir/EFI/BOOT/$bootloader"
+    sudo cp "./target/{{ if arch == "x86_64" { "x86_64-unknown-none-catten" } else if arch == "aarch64" { "aarch64-unknown-none-catten" } else if arch == "riscv64" { "riscv64gc-unknown-none-catten" } else { arch + "-unknown-none" } }}/{{profile}}/catten" ./limine.conf "$mount_dir"
 
 vm_memory := "512M"
 vm_num_lps := "8"

@@ -87,6 +87,32 @@ PC and Server:
 
 ## Contributing
 
+### Continuous integration
+
+The **Build OS images** GitHub Actions workflow attempts debug and release builds
+for every architecture with a build target: `x86_64`, `aarch64`, and `riscv64`.
+It runs on pushes to any branch, pull requests, and manual dispatches. Each branch
+must contain the workflow to run it; merge or cherry-pick the CI changes onto
+existing upstream branches that need coverage.
+
+Each architecture/profile has an independent job, so a failing platform does not
+cancel the other build attempts. The run summary reports kernel compilation and
+image creation separately, and successful images are available as artifacts for
+seven days. A successful build verifies compilation and packaging only; CI does
+not boot the images or establish hardware support for experimental platforms.
+
+Build jobs run in Fedora 44 containers on GitHub-hosted Ubuntu VMs, with build
+and image tools installed through `dnf`. The containers run in privileged mode
+to support loop devices and filesystem mounts. CI uses the toolchain in
+`rust-toolchain.toml`, adds `rust-src` for `build-std`, and runs
+`just build-catten <arch> <profile>` followed by
+`just --no-deps create-image <arch> <profile>`. Image creation on Linux requires
+`parted`, `dosfstools`, `util-linux`, and sudo access for loop devices and mounts.
+Cross-compiling the default display feature also requires Clang, libclang, and
+LLVM tools; the workflow supplies target-specific C compiler and bindgen flags.
+
+### Getting involved
+
 We welcome contributions of all forms—code, design proposals, documentation, and testing.  
 Please join our Discord or Matrix communities if you’d like to get involved.
 
