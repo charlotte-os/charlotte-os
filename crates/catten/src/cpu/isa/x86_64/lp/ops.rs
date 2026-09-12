@@ -4,12 +4,14 @@ pub fn init_lp_state() {
     unsafe {
         core::arch::asm! {
             "mov rax, cr4",
-            "or rax, 1<<16",
+            "or rax, 1<<16", // Set the bit to enable FSGSBASE instructions
             "mov cr4, rax",
-            "mov rax, 0",
-            "wrfsbase rax",
-            "wrgsbase rax",
-            out("rax") _
+            "rdtscp", // Read the kernel assigned processor ID from the TSC_AUX register
+            "wrfsbase rcx",
+            "wrgsbase rcx",
+            out("rax") _,
+            out("rcx") _,
+            out("rdx") _,
         }
     }
 }
