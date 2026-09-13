@@ -65,7 +65,7 @@ riscv_fw_dir := image_dir / "riscv64-firmware"
 # Where the guest's serial transcript is saved on the host; see the -chardev lines below.
 log_dir := "./logs"
 
-qemu-run-x86_64 profile="debug" features="qemu" gdb="false": (create-image "x86_64" profile features)
+qemu-run-x86_64 profile="debug" features="qemu" iommu_type="amd" gdb="false": (create-image "x86_64" profile features)
     mkdir -p {{ log_dir }}
     qemu-system-x86_64 \
         -enable-kvm \
@@ -87,7 +87,8 @@ qemu-run-x86_64 profile="debug" features="qemu" gdb="false": (create-image "x86_
         -device usb-net,netdev=usbnet0,bus=xhci.0 \
         -device usb-storage,bus=xhci.0,drive=usbdrive0 \
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
-        -device amd-iommu \
+        {{ if iommu_type == "amd" {"-device amd-iommu,intremap=on,xtsup=on,dma-remap=on"} else {""} }} \
+        {{ if iommu_type == "intel" {"-device intel-iommu,intremap=on,eim=on,dma-translation=on"} else {""} }} \
         -chardev stdio,id=catlog,signal=on,logfile={{ log_dir }}/catten-x86_64-{{ profile }}.log \
         -serial chardev:catlog \
         {{ if gdb == "true" {"-s -S"} else {""} }}

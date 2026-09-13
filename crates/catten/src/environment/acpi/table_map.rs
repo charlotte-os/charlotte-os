@@ -75,8 +75,10 @@ pub enum AcpiTableType {
            * a virtual machine => Unused by Catten */
     BGRT, /* Boot Graphics Resource Table, used to pass a boot logo from the firmware to the OS
            * => Unused by Catten */
+    DMAR, /* DMA Remapping Table, used for IOMMU support => Used by Catten to configure DMA
+           * remapping on systems with an Intel compatible IOMMU */
     IVRS, /* I/O Virtualization Reporting Structure, used by AMD's SVM => Used by Catten to
-           * determine if AMD SVM is supported */
+           * determine if an AMD compatible IOMMU is present */
     UEFI, /* UEFI ACPI table, used by UEFI drivers to avoid name collisions with ACPI tables =>
            * Unused by Catten */
     TPM2, /* Trusted Platform Module 2.0 Table, used for TPM 2.0 support => Unused by Catten */
@@ -129,6 +131,7 @@ impl TryFrom<[u8; 4]> for AcpiTableType {
             [b'H', b'P', b'E', b'T'] => Ok(Self::HPET),
             [b'W', b'A', b'E', b'T'] => Ok(Self::WAET),
             [b'B', b'G', b'R', b'T'] => Ok(Self::BGRT),
+            [b'D', b'M', b'A', b'R'] => Ok(Self::DMAR),
             [b'I', b'V', b'R', b'S'] => Ok(Self::IVRS),
             [b'U', b'E', b'F', b'I'] => Ok(Self::UEFI),
             [b'T', b'P', b'M', b'2'] => Ok(Self::TPM2),
