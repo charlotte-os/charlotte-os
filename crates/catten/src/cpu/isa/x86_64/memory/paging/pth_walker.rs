@@ -203,10 +203,6 @@ impl<'vas> PthWalker<'vas> {
         if self.pd_ptr.is_null() {
             // Allocate a new page table for the PD
             let new_pd = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame().unwrap();
-            crate::early_logln!(
-                "[HEAPDBG] mp new_pd={:#x}",
-                (<PAddr as Into<usize>>::into(new_pd.clone()))
-            );
             unsafe {
                 Self::set_table_entry(
                     &mut (*self.pdpt_ptr)[self.vaddr.pdpt_index()],

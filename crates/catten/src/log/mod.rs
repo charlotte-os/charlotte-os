@@ -3,60 +3,56 @@
 //! This module provides convenient macros for logging messages to the kernel
 //! log. They will be updated as the kernel develops to provide more
 //! functionality and use an actual kernel log that will reside in memory and be
-//! stored in a file. For now they print to the framebuffer and can be observed directly on the
-//! screen.
+//! stored in a file.
+//!
+//! There are two sinks behind the macros. The [early console](early) is a polled serial device at
+//! a fixed, architecture-defined address; it needs neither the heap nor a framebuffer, so it is
+//! available from the kernel's first statement and it is what [`early_log!`] and [`early_logln!`]
+//! write to. The [framebuffer terminal](flanterm) is what a user of the machine actually reads,
+//! but Flanterm allocates, so it cannot be touched until the heap is up.
+//!
+//! [`log!`] and [`logln!`] write to both. The duplication is deliberate: it makes the serial
+//! transcript — which a host running the kernel under QEMU can capture to a file — the whole
+//! kernel log rather than only the handful of lines that precede the heap.
 
 mod chars;
+pub mod early;
 pub mod flanterm;
 
-#[inline(always)]
-pub fn early_save_interrupts() -> bool {
-    #[cfg(target_arch = "x86_64")]
-    let interrupts_were_enabled = crate::cpu::isa::lp::ops::get_int_state();
-
-    #[cfg(not(target_arch = "x86_64"))]
-    let interrupts_were_enabled = true;
-
-    crate::cpu::isa::lp::ops::mask_interrupts!();
-    interrupts_were_enabled
-}
-
-#[inline(always)]
-pub fn early_restore_interrupts(interrupts_were_enabled: bool) {
-    if interrupts_were_enabled {
-        crate::cpu::isa::lp::ops::unmask_interrupts!();
-    }
-}
-
+/// Logs to the early console only, without a trailing line break.
+///
+/// Valid at any point after control passes from the bootloader, including before the heap exists.
 #[macro_export]
 macro_rules! early_log {
-    ($text:expr $(, $arg:tt)*) => {{
-        // let interrupts_were_enabled = $crate::log::early_save_interrupts();
-        // use core::fmt::Write;
-        // let _ = write!($crate::log::flanterm::FT_CTX.lock(), $text $(, $arg)*);
-        // $crate::log::early_restore_interrupts(interrupts_were_enabled);
-    }};
+    ($text:expr $(, $arg:tt)*) => ({
+        use core::fmt::Write;
+        let _ = write!($crate::log::early::EARLY_CONSOLE.lock(), $text $(, $arg)*);
+    })
 }
 
+/// Logs a line to the early console only.
+///
+/// Valid at any point after control passes from the bootloader, including before the heap exists.
+/// See [`logln!`] on why the line break is written by hand.
 #[macro_export]
 macro_rules! early_logln {
-    ($text:expr $(, $arg:tt)*) => {{
-        // let interrupts_were_enabled = $crate::log::early_save_interrupts();
-        // use core::fmt::Write;
-        // let mut ft_ctx = $crate::log::flanterm::FT_CTX.lock();
-        // let _ = write!(ft_ctx, $text $(, $arg)*);
-        // let _ = ft_ctx.write_str("\r\n");
-        // drop(ft_ctx);
-        // $crate::log::early_restore_interrupts(interrupts_were_enabled);
-    }};
+    ($text:expr $(, $arg:tt)*) => ({
+        use core::fmt::Write;
+        let mut console = $crate::log::early::EARLY_CONSOLE.lock();
+        let _ = write!(console, $text $(, $arg)*);
+        let _ = console.write_str("\r\n");
+    })
 }
 
 #[macro_export]
 macro_rules! log {
     ($text:expr $(, $arg:tt)*) => ({
         $crate::cpu::multiprocessor::interrupt_tracking::INT_STATE.save_int();
-        use core::fmt::Write;
-        let _ = write!($crate::log::flanterm::FT_CTX.lock(), $text $(, $arg)*);
+        {
+            use core::fmt::Write;
+            let _ = write!($crate::log::flanterm::FT_CTX.lock(), $text $(, $arg)*);
+        }
+        $crate::early_log!($text $(, $arg)*);
         $crate::cpu::multiprocessor::interrupt_tracking::INT_STATE.restore_int();
     })
 }
@@ -77,6 +73,7 @@ macro_rules! logln {
             let _ = write!(ft_ctx, $text $(, $arg)*);
             let _ = ft_ctx.write_str("\r\n");
         }
+        $crate::early_logln!($text $(, $arg)*);
         $crate::cpu::multiprocessor::interrupt_tracking::INT_STATE.restore_int();
     })
 }

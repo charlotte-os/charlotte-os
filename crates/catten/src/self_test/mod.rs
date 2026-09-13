@@ -11,20 +11,8 @@ use crate::logln;
 
 pub fn run_self_tests() {
     logln!("Running self tests...");
-    let probe = 0xffff8400001ffff8usize as *const usize; // heap vaddr -> phys 0x3ffff8
-    let hhdm = 0xffff8000003ffff8usize as *const usize; // HHDM alias of phys 0x3ffff8
-    crate::early_logln!(
-        "[HEAPDBG] probe@start heap={:#x} hhdm={:#x}",
-        (unsafe { probe.read() }),
-        (unsafe { hhdm.read() })
-    );
     memory::pmem::test_pmem();
     memory::vmem::test_vmem();
-    crate::early_logln!(
-        "[HEAPDBG] probe@after_vmem heap={:#x} hhdm={:#x}",
-        (unsafe { probe.read() }),
-        (unsafe { hhdm.read() })
-    );
     memory::allocator::test_allocator();
     logln!("Testing Complete. All Tests Passed!");
 }

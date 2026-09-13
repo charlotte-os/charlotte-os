@@ -62,8 +62,11 @@ vm_num_lps := "8"
 usb_image_path := "./test_data/disk_images/test-usb.img"
 # Padded, writable copies of the EDK2 riscv64 firmware; see qemu-run-riscv64.
 riscv_fw_dir := image_dir / "riscv64-firmware"
+# Where the guest's serial transcript is saved on the host; see the -chardev lines below.
+log_dir := "./logs"
 
 qemu-run-x86_64 profile="debug" features="qemu" gdb="false": (create-image "x86_64" profile features)
+    mkdir -p {{ log_dir }}
     qemu-system-x86_64 \
         -enable-kvm \
         -M q35,kernel-irqchip=split \
@@ -85,9 +88,12 @@ qemu-run-x86_64 profile="debug" features="qemu" gdb="false": (create-image "x86_
         -device usb-storage,bus=xhci.0,drive=usbdrive0 \
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
         -device amd-iommu \
+        -chardev stdio,id=catlog,signal=on,logfile={{ log_dir }}/catten-x86_64-{{ profile }}.log \
+        -serial chardev:catlog \
         {{ if gdb == "true" {"-s -S"} else {""} }}
 
 qemu-run-aarch64 profile="debug" gdb="false": (create-image "aarch64" profile)
+    mkdir -p {{ log_dir }}
     qemu-system-aarch64 \
         -M virt,iommu=smmuv3 \
         -cpu cortex-a710 \
@@ -104,6 +110,8 @@ qemu-run-aarch64 profile="debug" gdb="false": (create-image "aarch64" profile)
         -drive file={{image_dir}}/charlotte-aarch64-{{profile}}.img,format=raw \
         -device usb-storage,bus=xhci.0,drive=usbdrive0 \
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
+        -chardev stdio,id=catlog,signal=on,logfile={{ log_dir }}/catten-aarch64-{{ profile }}.log \
+        -serial chardev:catlog \
         {{ if gdb == "true" {"-s -S"} else {""} }}
 
 qemu-run-riscv64 profile="debug" gdb="false": (create-image "riscv64" profile)
@@ -113,6 +121,7 @@ qemu-run-riscv64 profile="debug" gdb="false": (create-image "riscv64" profile)
     # its natural size, so pad a copy of each to fit. The varstore also has to be writable, which
     # rules out pointing QEMU straight at the read-only files under /usr/share.
     mkdir -p {{riscv_fw_dir}}
+    mkdir -p {{log_dir}}
     code="{{riscv_fw_dir}}/RISCV_VIRT_CODE.fd"
     vars="{{riscv_fw_dir}}/RISCV_VIRT_VARS.fd"
     for fw in CODE VARS; do
@@ -122,6 +131,10 @@ qemu-run-riscv64 profile="debug" gdb="false": (create-image "riscv64" profile)
             truncate -s 32M "$dest"
         fi
     done
+    # riscv-iommu-pci defaults to off=on, which resets the IOMMU into Off mode and blocks all DMA
+    # until software programs ddtp. Nothing here has a RISC-V IOMMU driver yet, so the xHCI
+    # controller's DMA never lands and EDK2 spins forever on Enable Slot. off=off resets it to
+    # Bare instead, leaving the device enumerable at 00:02.0 to write a driver against.
     qemu-system-riscv64 \
         -M virt \
         -cpu tt-ascalon \
@@ -136,10 +149,12 @@ qemu-run-riscv64 profile="debug" gdb="false": (create-image "riscv64" profile)
         -device usb-mouse,bus=xhci.0 \
         -netdev user,id=usbnet0 \
         -device usb-net,netdev=usbnet0,bus=xhci.0 \
-        -device riscv-iommu-pci \
+        -device riscv-iommu-pci,off=off \
         -drive file={{image_dir}}/charlotte-riscv64-{{profile}}.img,format=raw \
         -device usb-storage,bus=xhci.0,drive=usbdrive0 \
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
+        -chardev stdio,id=catlog,signal=on,logfile={{log_dir}}/catten-riscv64-{{profile}}.log \
+        -serial chardev:catlog \
         {{ if gdb == "true" {"-s -S"} else {""} }}
 
 update-loc:
@@ -155,6 +170,7 @@ update-loc:
 clean:
     cargo clean
     rm -rf {{image_dir}}
+    rm -rf {{log_dir}}
 
 distclean: clean
     if [ -f Cargo.lock ]; then rm Cargo.lock; fi

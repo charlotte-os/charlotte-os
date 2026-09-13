@@ -19,10 +19,6 @@ use crate::memory::allocators::memory::PageSize;
 /// Page frames are 4 KiB in size on all supported architectures.
 const PAGE_FRAME_SIZE: usize = kibibytes(4);
 
-/// DEBUG: physical base of the kernel heap's large frame (0 = unset).
-pub static HEAP_PHYS_BASE: core::sync::atomic::AtomicUsize =
-    core::sync::atomic::AtomicUsize::new(0);
-
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
     UnableToAllocateTrackingStructure,
@@ -98,15 +94,6 @@ impl PhysicalFrameAllocator {
                     curr_byte_ptr.write_volatile(byte_val | (1 << bit_idx));
                     self.next_free_hint = byte_idx;
                     let raw_addr = (byte_idx * BITS_PER_BYTE + bit_idx) * PAGE_FRAME_SIZE;
-                    let hb = HEAP_PHYS_BASE.load(core::sync::atomic::Ordering::Relaxed);
-                    if hb != 0 && raw_addr >= hb && raw_addr < hb + crate::klib::size::mebibytes(2)
-                    {
-                        crate::early_logln!(
-                            "[HEAPDBG] !!! allocate_frame returned {:#x} INSIDE heap [{:#x},+2MiB)",
-                            raw_addr,
-                            hb
-                        );
-                    }
                     return Some(PhysicalAddress::try_from(raw_addr).map_err(Error::from));
                 }
             }
@@ -195,16 +182,10 @@ impl PhysicalFrameAllocator {
     }
 
     pub fn allocate_large_frame(&mut self) -> Result<PhysicalAddress, Error> {
-        let r = self.allocate_contiguous(
+        self.allocate_contiguous(
             PageSize::Large.num_bytes() / PAGE_FRAME_SIZE,
             PageSize::Large.num_bytes(),
-        );
-        if let Ok(ref frame) = r {
-            let raw: usize = <PhysicalAddress as Into<usize>>::into(frame.clone());
-            crate::early_logln!("[HEAPDBG] allocate_large_frame -> {:#x}", raw);
-            HEAP_PHYS_BASE.store(raw, core::sync::atomic::Ordering::Relaxed);
-        }
-        r
+        )
     }
 
     pub fn deallocate_large_frame(&mut self, frame_addr: PhysicalAddress) -> Result<(), Error> {
@@ -285,14 +266,6 @@ impl From<&MemmapResponse> for PhysicalFrameAllocator {
             }
         }
         early_logln!("Initializing PhysicalFrameAllocator bitmap...");
-        for entry in response.entries().iter() {
-            early_logln!(
-                "[HEAPDBG] mmap base={:#x} len={:#x} type={}",
-                (entry.base),
-                (entry.length),
-                (entry.type_)
-            );
-        }
         init_bitmap_from_mmap(pfa.bitmap_ptr, response);
         //address zero is not accessible
         unsafe {
