@@ -5,6 +5,7 @@
 //! reachable from the kernel's first instruction.
 
 use core::arch::asm;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 /// COM1's base I/O port.
 const COM1: u16 = 0x3f8;
@@ -26,15 +27,24 @@ const LCR_8N1: u8 = 0b11;
 const FCR_ENABLE_CLEAR: u8 = 0xc7;
 /// Modem control: assert data terminal ready and request to send.
 const MCR_DTR_RTS: u8 = 0b11;
+/// Modem control: loop the transmitter back to the receiver, for the presence test.
+const MCR_LOOPBACK: u8 = 0x1e;
 /// Line status: the transmit holding register is empty and will accept another byte.
 const LSR_THR_EMPTY: u8 = 1 << 5;
+/// Line status: a received byte is waiting in the receive buffer.
+const LSR_DATA_READY: u8 = 1 << 0;
 
-/// How many times to poll the line status register before giving a byte up for lost.
+/// Arbitrary byte sent through the loopback to see whether anything is listening.
+const PRESENCE_TEST_BYTE: u8 = 0xae;
+
+/// How many times to poll a status register before giving up on the port.
 ///
-/// A machine with no UART at `0x3f8` floats the bus high and reads back `0xff`, which has the
-/// empty bit set and so never stalls, but a chipset that reads back zero instead would hang the
-/// kernel here for want of hardware that was never there.
-const TX_POLL_LIMIT: u32 = 100_000;
+/// Nothing here can be allowed to spin forever on hardware that never answers, and the count is
+/// large enough that a real UART at the slowest sane baud rate will always win the race.
+const POLL_LIMIT: u32 = 100_000;
+
+/// Whether COM1 answered the loopback test, and so whether writing to it is worth anything.
+static PRESENT: AtomicBool = AtomicBool::new(false);
 
 #[inline]
 unsafe fn outb(port: u16, value: u8) {
@@ -71,13 +81,46 @@ pub(super) fn init() {
         outb(COM1 + INT_ENABLE, 0x00);
         outb(COM1 + LINE_CTRL, LCR_8N1);
         outb(COM1 + FIFO_CTRL, FCR_ENABLE_CLEAR);
+    }
+
+    PRESENT.store(is_present(), Ordering::Relaxed);
+
+    // SAFETY: plain port I/O. Leaving the port in its normal, non-looped state is worth doing even
+    // when the test failed, since a port that is merely late is better left configured than looped.
+    unsafe {
         outb(COM1 + MODEM_CTRL, MCR_DTR_RTS);
     }
 }
 
-pub(super) fn write_byte(byte: u8) {
+/// Reports whether a UART answers at COM1, by looping the transmitter back to the receiver and
+/// seeing whether a byte survives the round trip.
+///
+/// A board with no UART at `0x3f8` usually floats the bus and reads back `0xff`, but some chipsets
+/// answer `0x00` instead, and that pattern would otherwise make every log byte burn the full poll
+/// budget waiting on a transmitter that does not exist.
+fn is_present() -> bool {
     unsafe {
-        for _ in 0..TX_POLL_LIMIT {
+        outb(COM1 + MODEM_CTRL, MCR_LOOPBACK);
+        outb(COM1 + DATA, PRESENCE_TEST_BYTE);
+
+        for _ in 0..POLL_LIMIT {
+            if inb(COM1 + LINE_STATUS) & LSR_DATA_READY != 0 {
+                return inb(COM1 + DATA) == PRESENCE_TEST_BYTE;
+            }
+            core::hint::spin_loop();
+        }
+    }
+
+    false
+}
+
+pub(super) fn write_byte(byte: u8) {
+    if !PRESENT.load(Ordering::Relaxed) {
+        return;
+    }
+
+    unsafe {
+        for _ in 0..POLL_LIMIT {
             if inb(COM1 + LINE_STATUS) & LSR_THR_EMPTY != 0 {
                 outb(COM1 + DATA, byte);
                 return;
