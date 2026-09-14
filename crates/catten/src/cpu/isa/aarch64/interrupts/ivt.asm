@@ -30,8 +30,8 @@
 .extern irq_dispatcher
 .extern fiq_dispatcher
 .extern serr_dispatcher
-// Interrupt Vector Table
-// Given the scheme we empoloy each used IVT entry is 22 instructions exactly while the ISA requires 32 instructions
+// Exception Vector Table
+// Given the scheme we empoloy each used EVT entry is 22 instructions exactly while the ISA requires 32 instructions
 // This means that we have 10 instructions of padding for each IVT entry
 .balign 128
 .global ivt
@@ -77,7 +77,6 @@ push_volatile_regs
 bl sync_dispatcher
 pop_volatile_regs
 eret
-
 .balign 128
 push_volatile_regs
 bl irq_dispatcher
@@ -150,4 +149,4 @@ nop
 nop
 nop
 nop
-// End of IVT
+// End of EVT

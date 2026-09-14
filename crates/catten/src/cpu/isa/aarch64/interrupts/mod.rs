@@ -30,7 +30,19 @@ pub fn load_ivt() {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn sync_dispatcher() {}
+pub extern "C" fn sync_dispatcher() {
+    // The Exception State Register EL1 (ESR_EL1) holds information about the exception that
+    // occurred
+    let esr_el1: u64;
+    unsafe {
+        asm!("mrs {}, esr_el1", out(reg) esr_el1);
+    }
+    early_logln!("LP {}:Synchronous exception occurred with ESR_EL1 = {:#x}", get_lp_id(), esr_el1);
+    const EC_NUM_BITS: u64 = 6;
+    const EC_SHIFT: u64 = 26;
+    let exception_class = bitwise::mask_shift_read(esr_el1, (1 << EC_NUM_BITS) - 1, EC_SHIFT);
+    early_logln!("Exception class = {:#x}", exception_class);
+}
 #[unsafe(no_mangle)]
 pub extern "C" fn irq_dispatcher() {}
 #[unsafe(no_mangle)]

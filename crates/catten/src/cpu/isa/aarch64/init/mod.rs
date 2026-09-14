@@ -17,9 +17,9 @@ impl InitInterface for IsaInitializer {
         // Initialization code for the aarch64 architecture
         early_logln!("Performing Aarch64 ISA specific initialization...");
         // Setup the interrupt vector table
-        early_logln!("Loading the interrupt vector table on the AP");
+        early_logln!("Loading the interrupt vector table on the BSP");
         load_ivt();
-        early_logln!("Interrupt vector table loaded on the AP");
+        early_logln!("Interrupt vector table loaded on the BSP");
 
         early_logln!("Aarch64 ISA specific initialization complete!");
         Ok(())
