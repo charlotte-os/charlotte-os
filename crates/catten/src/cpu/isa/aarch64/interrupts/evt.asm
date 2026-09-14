@@ -32,10 +32,10 @@
 .extern serr_dispatcher
 // Exception Vector Table
 // Given the scheme we empoloy each used EVT entry is 22 instructions exactly while the ISA requires 32 instructions
-// This means that we have 10 instructions of padding for each IVT entry
+// This means that we have 10 instructions of padding for each EVT entry
 .balign 128
-.global ivt
-ivt:
+.global evt
+evt:
 // Exception from current EL while using SP_EL0
 // Unused because we don't use SP_EL0 as the stack pointer in kernelspace
 nop
