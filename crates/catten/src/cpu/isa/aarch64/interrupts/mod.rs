@@ -29,6 +29,14 @@ pub fn load_evt() {
     }
 }
 
+enum ExceptionClass {
+    Unknown = 0,
+    InstructionAbortLowerEl = 0x20,
+    InstructionAbortCurrentEl = 0x21,
+    DataAbortLowerEl = 0x24,
+    DataAbortCurrentEl = 0x25,
+}
+
 #[unsafe(no_mangle)]
 pub extern "C" fn sync_dispatcher() {
     // The Exception State Register EL1 (ESR_EL1) holds information about the exception that
