@@ -1,6 +1,6 @@
 pub(super) mod interrupt_flags;
 pub(super) mod interrupt_source_override;
-pub(super) mod ioapic;
+pub mod ioapic;
 pub(super) mod local_x2apic_nmi;
 pub(super) mod nmi_source;
 
@@ -14,7 +14,7 @@ use crate::environment::acpi::table_map::{AcpiTableHeader, AcpiTableType, find_t
 use crate::memory::VirtualAddress;
 use crate::memory::physical::PhysicalAddressIfce;
 
-pub(super) static MADT_INDEX: LazyLock<MadtEntryIndex> = LazyLock::new(|| {
+pub static MADT_INDEX: LazyLock<MadtEntryIndex> = LazyLock::new(|| {
     let madt_paddrs = find_table_type(AcpiTableType::MADT)
         .expect("[ACPI] PANIC: No MADT tables found on this ACPI based system.");
     if madt_paddrs.len() > 1 {
@@ -29,17 +29,20 @@ pub(super) static MADT_INDEX: LazyLock<MadtEntryIndex> = LazyLock::new(|| {
 const NUM_ENTRY_TYPES: usize = 28usize;
 
 pub struct MadtEntryIndex {
-    ptr_matrix: [Vec<&'static MadtEntryGeneric>; NUM_ENTRY_TYPES],
+    ptr_matrix: [Vec<*const MadtEntryGeneric>; NUM_ENTRY_TYPES],
 }
 
 impl MadtEntryIndex {
-    pub(super) fn get_entries_with_type(
+    pub fn get_entries_with_type(
         &self,
         entry_type: MadtEntryType,
-    ) -> &Vec<&'static MadtEntryGeneric> {
+    ) -> &Vec<*const MadtEntryGeneric> {
         &self.ptr_matrix[entry_type as usize]
     }
 }
+
+unsafe impl Sync for MadtEntryIndex {}
+unsafe impl Send for MadtEntryIndex {}
 
 #[derive(Debug)]
 #[repr(C, packed)]
@@ -60,11 +63,11 @@ impl MadtEntryIter {
     pub fn new(madt_ptr: *const Madt) -> Self {
         Self {
             ptr: unsafe {
-                NonNull::new((madt_ptr as *const u8).add(core::mem::size_of::<Madt>())
+                NonNull::new((madt_ptr as *const u8).byte_add(core::mem::size_of::<Madt>())
                     as *mut MadtEntryGeneric)
             },
             end_ptr: VirtualAddress::from_ptr(unsafe {
-                (madt_ptr as *const u8).add((*madt_ptr).header.length as usize)
+                (madt_ptr as *const u8).byte_add((*madt_ptr).header.length as usize)
             }),
         }
     }
@@ -76,12 +79,12 @@ impl Iterator for MadtEntryIter {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(nn_ptr) = self.ptr {
             let entry_length = unsafe { nn_ptr.read() }.entry_length;
-            if VirtualAddress::from_ptr(unsafe { nn_ptr.as_ptr().add(entry_length as usize) })
-                > self.end_ptr
+            if VirtualAddress::from_ptr(unsafe { nn_ptr.as_ptr().byte_add(entry_length as usize) })
+                >= self.end_ptr
             {
                 self.ptr = None;
             } else {
-                self.ptr = NonNull::new(unsafe { nn_ptr.as_ptr().add(entry_length as usize) });
+                self.ptr = NonNull::new(unsafe { nn_ptr.as_ptr().byte_add(entry_length as usize) });
             }
         }
         self.ptr
@@ -89,19 +92,21 @@ impl Iterator for MadtEntryIter {
 }
 
 #[derive(Debug)]
-#[repr(transparent)]
+#[repr(C, packed)]
 pub struct Madt {
     header: AcpiTableHeader,
+    lic_address: u32,
+    flags: u32,
 }
 
 impl Madt {
     pub fn parse(&self) -> MadtEntryIndex {
-        let mut ptr_matrix: [Vec<&'static MadtEntryGeneric>; NUM_ENTRY_TYPES] = Default::default();
+        let mut ptr_matrix: [Vec<*const MadtEntryGeneric>; NUM_ENTRY_TYPES] = Default::default();
         let iter = MadtEntryIter::new(self);
         for entry_ptr in iter {
             let entry_type = unsafe { entry_ptr.as_ref() }.entry_type as usize;
             if entry_type < NUM_ENTRY_TYPES {
-                ptr_matrix[entry_type].push(unsafe { entry_ptr.as_ref() });
+                ptr_matrix[entry_type].push(entry_ptr.as_ptr());
             }
         }
         MadtEntryIndex {

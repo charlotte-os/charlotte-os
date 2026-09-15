@@ -1,6 +1,6 @@
 use spin::LazyLock;
 
-use crate::environment::acpi::sdt::madt::{IrqGsiMapping, create_irq_gsi_mapping_table};
+use crate::environment::acpi::sdt::madt::interface::{IrqGsiMapping, create_irq_gsi_mapping_table};
 
 pub const LEGACY_IRQ_COUNT: usize = 16;
 

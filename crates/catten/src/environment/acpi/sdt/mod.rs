@@ -27,3 +27,5 @@ pub struct GenericAddressStructure {
     access_size: u8, // 8 * pow(2, AccessSize) bytes
     address: u64,
 }
+
+type GlobalSystemInterrupt = u32;

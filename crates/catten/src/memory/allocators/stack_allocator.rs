@@ -20,7 +20,6 @@ use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
 use crate::cpu::isa::memory::paging::PAGE_SIZE;
 use crate::cpu::isa::memory::{MemoryInterface, MemoryInterfaceImpl};
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
-use crate::klib::size;
 use crate::memory::allocators::memory::{PageSize, try_allocate_and_map_range};
 use crate::memory::allocators::{self};
 use crate::memory::linear::VirtualAddress;

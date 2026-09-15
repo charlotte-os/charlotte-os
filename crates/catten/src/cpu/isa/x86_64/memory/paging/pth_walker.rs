@@ -162,7 +162,7 @@ impl<'vas> PthWalker<'vas> {
         self.pd_ptr = self.walk_next_level(self.pdpt_ptr, self.vaddr.pdpt_index(), false, false)?;
         self.pt_ptr = core::ptr::null_mut();
         self.page_frame_ptr = self
-            .walk_next_level(self.pd_ptr, self.vaddr.pd_index(), true, false)?
+            .walk_next_level(self.pd_ptr, self.vaddr.pd_index(), false, false)?
             .cast::<[u8; super::PAGE_SIZE]>();
 
         Ok(())
@@ -242,9 +242,6 @@ impl<'vas> PthWalker<'vas> {
                 no_execute,
                 false,
             );
-            // for those who may not immediately see it, this is the Rust equivalent of
-            // memset being used to clear the newly mapped page
-            core::ptr::write_bytes(<PhysicalAddress as Into<*mut u8>>::into(frame), 0, PAGE_SIZE);
         }
         self.address_space.load().expect("Failed to reload the address space");
         unsafe {

@@ -1,18 +1,18 @@
 /// Obtain a bitfield from a larger word size.
 #[inline(always)]
-pub fn mask_shift_read<T>(val: T, mask: T, shift: u8) -> T
+pub fn read_subfield<T>(val: T, rshift: u8, mask: T) -> T
 where
     T: core::ops::BitAnd<Output = T> + core::ops::Shr<u8, Output = T>,
 {
-    (val & mask) >> shift
+    (val >> rshift) & mask
 }
 /// Used to compare against bitfields embedded in larger word sizes.
 #[inline(always)]
-pub fn mask_shift_cmp<T>(val: T, mask: T, shift: T, cmp: T) -> bool
+pub fn mask_shift_cmp<T>(val: T, rshift: u8, mask: T, cmp: T) -> bool
 where
-    T: core::ops::BitAnd<Output = T> + core::ops::Shr<T, Output = T> + core::cmp::PartialEq + Copy,
+    T: core::ops::BitAnd<Output = T> + core::ops::Shr<u8, Output = T> + core::cmp::PartialEq + Copy,
 {
-    (val & mask) >> shift == cmp
+    (val >> rshift) & mask == cmp
 }
 #[inline(always)]
 pub fn mask_from_shift_len<T>(shift: u8, len: u8) -> T

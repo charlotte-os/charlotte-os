@@ -8,7 +8,7 @@
 //! - Providing a unified interface for devices to register and unregister interrupt handlers.
 //! - Ensuring that the interrupt service load is roughly balanced across all logical processors in
 //!   the system.
-
+#[cfg(target_arch = "x86_64")]
 pub mod legacy_irqs;
 
 use hashbrown::HashMap;

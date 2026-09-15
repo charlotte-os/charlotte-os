@@ -23,6 +23,18 @@ pub enum PageType {
 }
 
 impl PageType {
+    pub fn is_global(&self) -> bool {
+        match *self {
+            PageType::KernelCode
+            | PageType::KernelData
+            | PageType::KernelRoData
+            | PageType::Mmio
+            | PageType::DirectMemoryAccess
+            | PageType::Framebuffer => true,
+            _ => false,
+        }
+    }
+
     pub fn is_user_accessible(&self) -> bool {
         match *self {
             PageType::UserCode | PageType::UserData | PageType::UserRoData => true,

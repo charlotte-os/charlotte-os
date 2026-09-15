@@ -2,17 +2,26 @@ mod irte;
 
 use core::ptr::NonNull;
 
+use hashbrown::HashMap;
+use spin::LazyLock;
+
 use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
-use crate::klib::bitwise::mask_shift_read;
+use crate::cpu::multiprocessor::spin::mutex::Mutex;
+use crate::cpu::multiprocessor::spin::rwlock::RwLock;
+use crate::environment::acpi::sdt::madt::interface::enumerate_ioapics;
+use crate::klib::bitwise::read_subfield;
 use crate::memory::VirtualAddress;
 
-//pub static IOAPIC_LIST: RwLock<HashMap<IoapicId, Mutex<IoapicDescriptor>>>
+pub static IOAPIC_LIST: LazyLock<RwLock<HashMap<IoapicId, Mutex<IoapicDescriptor>>>> =
+    LazyLock::new(|| RwLock::new(unsafe { enumerate_ioapics() }));
 
 pub type IoapicId = u8;
 
+#[derive(Debug)]
 pub struct IoapicDescriptor {
     base: VirtualAddress,
     version: u8,
+    acpi_gsi_base: u32,
     num_redirection_entries: u8,
 }
 
@@ -25,7 +34,7 @@ impl IoapicDescriptor {
     ///
     /// The caller must ensure that the base address is valid and points to a properly mapped IOAPIC
     /// MMIO region.
-    unsafe fn new(base: VirtualAddress) -> Self {
+    pub unsafe fn new(base: VirtualAddress, acpi_gsi_base: u32) -> Self {
         // save the MMIO addresses
         let io_reg_sel_addr = base.clone().into_mut::<u32>();
         let io_reg_win_addr = (base + 0x10usize).into_mut::<u32>();
@@ -41,11 +50,12 @@ impl IoapicDescriptor {
         const IOAPIC_REDIRECTION_ENTRY_MAX_SHIFT: u8 = 16;
         Self {
             base,
+            acpi_gsi_base,
             version: (version_reg & IOAPIC_VERSION_MASK) as u8,
-            num_redirection_entries: (mask_shift_read(
+            num_redirection_entries: (read_subfield(
                 version_reg,
-                IOAPIC_REDIRECTION_ENTRY_MAX_MASK,
                 IOAPIC_REDIRECTION_ENTRY_MAX_SHIFT,
+                IOAPIC_REDIRECTION_ENTRY_MAX_MASK,
             ) + 1) as u8,
         }
     }

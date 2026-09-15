@@ -6,7 +6,7 @@ use crate::device_management::drivers::busses::pci_express::ecam::capabilities::
     PciCapabilityId,
     find_capability,
 };
-use crate::klib::bitwise::mask_shift_read;
+use crate::klib::bitwise::read_subfield;
 
 /// This is the offset where the extended capability range starts in the PCI Express extended
 /// configuration space.
@@ -47,7 +47,7 @@ impl PcieExtCapVerOffset {
     pub fn get_offset(&self) -> u16 {
         const OFFSET_MASK: u16 = 0xfff0;
         const OFFSET_SHIFT: u8 = 4;
-        mask_shift_read(self.0, OFFSET_MASK, OFFSET_SHIFT)
+        read_subfield(self.0, OFFSET_SHIFT, OFFSET_MASK)
     }
 }
 

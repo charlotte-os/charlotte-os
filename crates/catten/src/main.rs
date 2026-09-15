@@ -48,6 +48,7 @@ use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::cpu::scheduler::{spawn_thread, yield_lp};
+use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::IOAPIC_LIST;
 use crate::device_management::topology::DEVICE_TOPOLOGY;
 use crate::memory::KERNEL_ASID;
 
@@ -92,6 +93,9 @@ pub extern "C" fn bsp_main() -> ! {
     logln!("Spawning initial kernel thread to probe device topology...");
     let thread_id = spawn_thread(KERNEL_ASID, probe_device_topology);
     logln!("Initial thread spawned with ID = {thread_id}.");
+    logln!("Spawning thread to enumerate IOAPICs...");
+    let ioapic_enumeration_thread_id = spawn_thread(KERNEL_ASID, print_ioapic_info);
+    logln!("IOAPIC enumeration thread spawned with ID = {ioapic_enumeration_thread_id}.");
     // for _ in 0..(get_lp_count() * 2) {
     //     logln!("Spawning additional kernel threads to test scheduler...");
     //     let thread_id = spawn_thread(KERNEL_ASID, test_fn);
@@ -147,6 +151,15 @@ pub extern "C" fn probe_device_topology() {
     loop {
         yield_lp();
     }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn print_ioapic_info() {
+    logln!("LP {}: Printing IOAPIC information...", (get_lp_id()));
+    let ioapic_list = IOAPIC_LIST.read();
+    ioapic_list.iter().for_each(|(id, desc)| {
+        logln!("Enumerated IOAPIC with ID = {:?}: {:?}", id, (desc.lock()));
+    });
 }
 
 #[unsafe(no_mangle)]

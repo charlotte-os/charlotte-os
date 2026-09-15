@@ -3,7 +3,6 @@
 pub mod dynamic;
 pub mod fixed;
 pub mod idt;
-pub mod ioapic;
 pub mod x2apic;
 
 use idt::*;

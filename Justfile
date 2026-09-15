@@ -89,7 +89,7 @@ qemu-run-x86_64 profile="debug" features="qemu" iommu_type="amd" gdb="false": (c
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
         {{ if iommu_type == "amd" {"-device amd-iommu,intremap=on,xtsup=on,dma-remap=on"} else {""} }} \
         {{ if iommu_type == "intel" {"-device intel-iommu,intremap=on,eim=on,dma-translation=on"} else {""} }} \
-        -chardev stdio,id=catlog,signal=on,logfile={{ log_dir }}/catten-x86_64-{{ profile }}.log \
+        -chardev stdio,id=catlog,signal=on,logfile={{ log_dir }}/catten-x86_64-{{ profile }}.log.txt \
         -serial chardev:catlog \
         {{ if gdb == "true" {"-s -S"} else {""} }}
 
@@ -111,7 +111,7 @@ qemu-run-aarch64 profile="debug" gdb="false": (create-image "aarch64" profile)
         -drive file={{image_dir}}/charlotte-aarch64-{{profile}}.img,format=raw \
         -device usb-storage,bus=xhci.0,drive=usbdrive0 \
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
-        -chardev stdio,id=catlog,signal=on,logfile={{ log_dir }}/catten-aarch64-{{ profile }}.log \
+        -chardev stdio,id=catlog,signal=on,logfile={{ log_dir }}/catten-aarch64-{{ profile }}.log.txt \
         -serial chardev:catlog \
         {{ if gdb == "true" {"-s -S"} else {""} }}
 
@@ -154,7 +154,7 @@ qemu-run-riscv64 profile="debug" gdb="false": (create-image "riscv64" profile)
         -drive file={{image_dir}}/charlotte-riscv64-{{profile}}.img,format=raw \
         -device usb-storage,bus=xhci.0,drive=usbdrive0 \
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
-        -chardev stdio,id=catlog,signal=on,logfile={{log_dir}}/catten-riscv64-{{profile}}.log \
+        -chardev stdio,id=catlog,signal=on,logfile={{log_dir}}/catten-riscv64-{{profile}}.log.txt \
         -serial chardev:catlog \
         {{ if gdb == "true" {"-s -S"} else {""} }}
 

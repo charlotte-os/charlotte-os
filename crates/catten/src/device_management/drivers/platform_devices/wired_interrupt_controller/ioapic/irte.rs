@@ -4,9 +4,9 @@ use crate::klib::bitwise::splice_into;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// IOxAPIC Interrupt Redirection Table Entry (IRTE)
-pub(super) struct Irte(u64);
+pub struct Irte(u64);
 
-pub(super) enum DeliveryMode {
+pub enum DeliveryMode {
     Fixed = 0b000,
     LowestPriority = 0b001,
     // System Management Interrupt (SMI)
