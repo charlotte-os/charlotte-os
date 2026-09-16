@@ -1,0 +1,20 @@
+[package]
+name = "uacpi-wrapper"
+version = "0.1.0"
+edition = "2024"
+description = "Freestanding Rust bindings to the vendored uACPI interpreter and table subsystem"
+# The vendored C sources under vendor/uacpi are MIT; this crate's own code
+# follows the rest of the workspace.
+license = "AGPL-3.0-or-later"
+links = "uacpi"
+build = "build.rs"
+
+[lib]
+name = "uacpi_wrapper"
+path = "src/lib.rs"
+test = false
+bench = false
+
+[build-dependencies]
+bindgen = { version = ">=0.72.1" }
+cc = { version = ">=1.4.4" }

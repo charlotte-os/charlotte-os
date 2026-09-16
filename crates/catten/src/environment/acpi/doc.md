@@ -25,9 +25,14 @@ ACPI implementation made to be robust enough to handle buggy firmware can be ver
 understand how to work with ACPI and handle various edge cases and quirks of real world
 firmware.
 
-It should be noted however that the Catten kernel does not and will not integrate uACPI or any
-other third party ACPI implementation. Accordingly this subsystem is to be developed entirely
-independently in manually written Rust and in such a way as to be tightly integrated with the
-rest of the kernel. Features will be added as they are needed and the implementation will
-generally assume that target system firmware appropriately conforms to the latest published ACPI
-specification or a prior forward compatible version.
+Catten now vendors uACPI and links it through the `uacpi-wrapper` crate, which compiles it for
+the kernel's target and generates raw bindings to its public headers. uACPI is only half a
+library: everything it declares in `uacpi/kernel_api.h` is a function the kernel owes it, and the
+`uacpi_host` submodule here is where Catten answers for memory, mapping, locking, timing, PCI and
+SystemIO access, interrupt installation and deferred work. That module is scaffolding at present,
+so nothing has driven the interpreter yet.
+
+The hand written `sdt` submodule continues to do the early table parsing the kernel needs before
+an interpreter can reasonably run, and it will generally assume that target system firmware
+appropriately conforms to the latest published ACPI specification or a prior forward compatible
+version.

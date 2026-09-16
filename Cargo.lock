@@ -60,6 +60,7 @@ dependencies = [
  "lock_api",
  "spin",
  "talc",
+ "uacpi-wrapper",
 ]
 
 [[package]]
@@ -324,6 +325,14 @@ checksum = "53f8ad14fa1c1b8635114abf9721076fe1e869572a5f26a52690f407292c80dc"
 dependencies = [
  "allocator-api2 0.4.0",
  "lock_api",
+]
+
+[[package]]
+name = "uacpi-wrapper"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cc",
 ]
 
 [[package]]

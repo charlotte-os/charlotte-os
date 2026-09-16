@@ -12,3 +12,10 @@ path = ["crates/ft-wrapper/vendor/flanterm/**"]
 precedence = "closest"
 SPDX-FileCopyrightText = "2022-2026 Mintsuki and contributors"
 SPDX-License-Identifier = "BSD-2-Clause"
+
+# Upstream uACPI, vendored verbatim and built by the uacpi-wrapper crate.
+[[annotations]]
+path = ["crates/uacpi-wrapper/vendor/uacpi/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2022-2026 Daniil Tatianin"
+SPDX-License-Identifier = "MIT"

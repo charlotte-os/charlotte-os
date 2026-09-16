@@ -13,7 +13,7 @@ bench = false
 [features]
 default = ["acpi", "display"]
 
-acpi = []
+acpi = ["dep:uacpi-wrapper"]
 devicetree = ["dep:flat_device_tree"]
 # If this is disabled all display code will be stripped out to reduce size for headless systems.
 display = ["dep:ft-wrapper"]
@@ -29,4 +29,5 @@ hashbrown = { version = ">=0.16.0", features = ["nightly"] }
 spin = { version = ">=0.10.0", features = ["lock_api"] }
 talc = { version = ">=5.1.0", features = ["nightly", "counters"] }
 ft-wrapper = { path = "../ft-wrapper", optional = true }
+uacpi-wrapper = { path = "../uacpi-wrapper", optional = true }
 flat_device_tree = { version = ">=3.1.1", optional = true }
