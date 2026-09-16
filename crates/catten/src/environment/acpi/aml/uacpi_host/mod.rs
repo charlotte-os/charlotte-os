@@ -30,6 +30,8 @@
 //! [`uacpi_initialize`](uacpi_wrapper::uacpi_initialize) until the functions the chosen
 //! initialisation level depends on are real.
 
+use core::ops::Add;
+
 use uacpi_wrapper::{
     uacpi_bool,
     uacpi_cpu_flags,
@@ -52,8 +54,10 @@ use uacpi_wrapper::{
     uacpi_work_type,
 };
 
+use crate::cpu::isa::interface::memory::address::Address;
 use crate::log;
 use crate::memory::PhysicalAddress;
+use crate::memory::allocators::memory::PageSize;
 
 /* ------------------------------------------------------------------------------------------- *
  * Table discovery                                                                              *
@@ -87,8 +91,10 @@ pub unsafe extern "C" fn uacpi_kernel_map(
     addr: uacpi_phys_addr,
     len: uacpi_size,
 ) -> *mut core::ffi::c_void {
-    let _ = (addr, len);
-    todo!("Map the requested physical range, most likely straight through the HHDM.")
+    let phys_base = PhysicalAddress::from(addr);
+    let start_frame = &phys_base.prev_aligned_to(PageSize::Standard.num_bytes());
+    let end_frame = &phys_base.add(len).next_aligned_to(PageSize::Standard.num_bytes());
+    let num_frames = (end_frame - start_frame) / PageSize::Standard.num_bytes();
 }
 
 /// Releases a mapping previously returned by [`uacpi_kernel_map`].

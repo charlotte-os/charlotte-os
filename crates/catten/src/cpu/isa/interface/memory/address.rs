@@ -14,6 +14,7 @@ pub trait Address:
     + core::ops::Sub<isize, Output = Self>
     + core::ops::Add<usize, Output = Self>
     + core::ops::Sub<usize, Output = Self>
+    + core::ops::Sub<Self, Output = isize>
 {
     const MIN: Self;
     const MAX: Self;

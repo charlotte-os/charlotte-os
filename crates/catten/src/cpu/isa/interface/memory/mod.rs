@@ -3,6 +3,7 @@ pub mod address;
 use crate::cpu::isa::memory::MemoryInterfaceImpl;
 use crate::cpu::isa::memory::address::paddr::PhysicalAddress;
 use crate::cpu::isa::memory::address::vaddr::VirtualAddress;
+use crate::memory::allocators::memory::PageSize;
 pub use crate::memory::linear::{MemoryMapping, PageType};
 
 pub trait MemoryInterface {
@@ -76,4 +77,45 @@ pub trait AddressSpaceInterface {
         &mut self,
         vaddr: VirtualAddress,
     ) -> Result<PhysicalAddress, <MemoryInterfaceImpl as MemoryInterface>::Error>;
+
+    fn map_range(
+        &mut self,
+        phys_base: PhysicalAddress,
+        virt_base: VirtualAddress,
+        page_type: PageType,
+        page_size: PageSize,
+        num_pages: usize,
+    ) -> Result<(), <MemoryInterfaceImpl as MemoryInterface>::Error> {
+        let mapping_function = match page_size {
+            PageSize::Standard => Self::map_page,
+            PageSize::Large => Self::map_large_page,
+            PageSize::Huge => Self::map_huge_page,
+        };
+        for n in 0..num_pages {
+            let mapping = MemoryMapping {
+                vaddr: virt_base + n * page_size.num_bytes(),
+                paddr: phys_base + n * page_size.num_bytes(),
+                page_type,
+            };
+            mapping_function(self, mapping)?;
+        }
+        Ok(())
+    }
+
+    fn find_and_map_range(
+        &mut self,
+        phys_base: PhysicalAddress,
+        page_type: PageType,
+        page_size: PageSize,
+        num_pages: usize,
+        range: (VirtualAddress, VirtualAddress),
+    ) -> Result<(), <MemoryInterfaceImpl as MemoryInterface>::Error> {
+        let find_function = match page_size {
+            PageSize::Standard => Self::find_free_region,
+            PageSize::Large => Self::find_free_region_large_aligned,
+            PageSize::Huge => Self::find_free_region_huge_aligned,
+        };
+        let virt_base = find_function(self, num_pages, range)?;
+        self.map_range(phys_base, virt_base, page_type, page_size, num_pages)
+    }
 }
