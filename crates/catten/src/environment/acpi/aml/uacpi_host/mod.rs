@@ -52,6 +52,7 @@ use uacpi_wrapper::{
     uacpi_work_type,
 };
 
+use crate::log;
 use crate::memory::PhysicalAddress;
 
 /* ------------------------------------------------------------------------------------------- *
@@ -110,8 +111,11 @@ pub unsafe extern "C" fn uacpi_kernel_log(
     level: uacpi_log_level,
     message: *const core::ffi::c_char,
 ) {
-    let _ = (level, message);
-    todo!("Forward the message to the kernel log, translating the level and the line ending.")
+    log!(
+        "[ACPI][uACPI] {}: {}",
+        level,
+        (unsafe { core::ffi::CStr::from_ptr(message) }.to_str().unwrap_or("<invalid UTF-8>"))
+    );
 }
 
 /* ------------------------------------------------------------------------------------------- *
