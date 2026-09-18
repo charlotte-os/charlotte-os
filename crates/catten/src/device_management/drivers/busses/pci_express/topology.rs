@@ -120,27 +120,17 @@ impl PcieTopology {
         }
     }
 
-    pub(super) fn get_cfg_space_vaddr(
-        &self,
-        segment_group: PcieSegmentGroupNum,
-        bus_segment: PcieBusSegmentNum,
-        device_num: PcieDeviceNum,
-        function_num: PcieFunctionNum,
-    ) -> Result<VirtualAddress, Error> {
+    pub fn get_cfg_space_vaddr(&self, location: PcieLocation) -> Result<VirtualAddress, Error> {
         let segment_group = self
             .segments
             .iter()
-            .find(|sg| sg.pcie_segment_group_num == segment_group)
+            .find(|sg| sg.pcie_segment_group_num == location.segment_group)
             .ok_or(Error::InvalidLocation)?;
-        if bus_segment < segment_group.start_bus_num || bus_segment > segment_group.end_bus_num {
+        if location.bus_segment < segment_group.start_bus_num
+            || location.bus_segment > segment_group.end_bus_num
+        {
             return Err(Error::InvalidLocation);
         }
-        let location = PcieLocation::new(
-            segment_group.pcie_segment_group_num,
-            bus_segment,
-            device_num,
-            function_num,
-        );
         Ok(segment_group.ecam_vaddr + location.get_ecam_offset())
     }
 }

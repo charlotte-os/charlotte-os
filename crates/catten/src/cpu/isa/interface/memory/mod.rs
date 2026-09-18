@@ -85,7 +85,7 @@ pub trait AddressSpaceInterface {
         page_type: PageType,
         page_size: PageSize,
         num_pages: usize,
-    ) -> Result<(), <MemoryInterfaceImpl as MemoryInterface>::Error> {
+    ) -> Result<VirtualAddress, <MemoryInterfaceImpl as MemoryInterface>::Error> {
         let mapping_function = match page_size {
             PageSize::Standard => Self::map_page,
             PageSize::Large => Self::map_large_page,
@@ -99,7 +99,7 @@ pub trait AddressSpaceInterface {
             };
             mapping_function(self, mapping)?;
         }
-        Ok(())
+        Ok(virt_base)
     }
 
     fn find_and_map_range(
@@ -109,7 +109,7 @@ pub trait AddressSpaceInterface {
         page_size: PageSize,
         num_pages: usize,
         range: (VirtualAddress, VirtualAddress),
-    ) -> Result<(), <MemoryInterfaceImpl as MemoryInterface>::Error> {
+    ) -> Result<VirtualAddress, <MemoryInterfaceImpl as MemoryInterface>::Error> {
         let find_function = match page_size {
             PageSize::Standard => Self::find_free_region,
             PageSize::Large => Self::find_free_region_large_aligned,

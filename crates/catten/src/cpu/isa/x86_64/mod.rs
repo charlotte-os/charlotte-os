@@ -11,6 +11,7 @@
 pub mod constants;
 pub mod init;
 pub mod interrupts;
+#[cfg(feature = "acpi")]
 pub mod io;
 pub mod lp;
 pub mod memory;

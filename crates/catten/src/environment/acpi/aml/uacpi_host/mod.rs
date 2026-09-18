@@ -29,9 +29,13 @@
 //! [`uacpi_setup_early_table_access`](uacpi_wrapper::uacpi_setup_early_table_access) or
 //! [`uacpi_initialize`](uacpi_wrapper::uacpi_initialize) until the functions the chosen
 //! initialisation level depends on are real.
+mod io;
 
+use alloc::boxed::Box;
+use core::ffi::c_void;
 use core::ops::Add;
 
+use io::{ACPI_CLAIMED_IO_REGIONS, IoRegion, overlaps_acpi_claimed};
 use uacpi_wrapper::{
     uacpi_bool,
     uacpi_cpu_flags,
@@ -52,12 +56,23 @@ use uacpi_wrapper::{
     uacpi_u64,
     uacpi_work_handler,
     uacpi_work_type,
+    *,
 };
 
-use crate::cpu::isa::interface::memory::address::Address;
+use crate::cpu::isa;
+use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
+use crate::device_management::drivers::busses::pci_express::topology::{
+    PcieDeviceNum,
+    PcieFunctionNum,
+    PcieLocation,
+};
+use crate::device_management::topology::DEVICE_TOPOLOGY;
 use crate::log;
-use crate::memory::PhysicalAddress;
 use crate::memory::allocators::memory::PageSize;
+use crate::memory::linear::PageType;
+use crate::memory::linear::address_map::LA_MAP;
+use crate::memory::linear::address_map::RegionType::{KernelAllocatorArena, KernelMmio};
+use crate::memory::{AddressSpaceInterface, KERNEL_AS, PhysicalAddress, VirtualAddress};
 
 /* ------------------------------------------------------------------------------------------- *
  * Table discovery                                                                              *
@@ -94,14 +109,33 @@ pub unsafe extern "C" fn uacpi_kernel_map(
     let phys_base = PhysicalAddress::from(addr);
     let start_frame = &phys_base.prev_aligned_to(PageSize::Standard.num_bytes());
     let end_frame = &phys_base.add(len).next_aligned_to(PageSize::Standard.num_bytes());
-    let num_frames = (end_frame - start_frame) / PageSize::Standard.num_bytes();
+    let num_frames = (*end_frame - *start_frame) as usize / PageSize::Standard.num_bytes();
+
+    let mut kas = KERNEL_AS.lock();
+    kas.find_and_map_range(
+        phys_base,
+        PageType::Mmio,
+        PageSize::Standard,
+        num_frames,
+        (*LA_MAP.get_region(KernelMmio)).into(),
+    )
+    .expect("[ACPI][uACPI] Failed to map a region into the kernel address space.")
+    .into_mut()
 }
 
 /// Releases a mapping previously returned by [`uacpi_kernel_map`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_unmap(addr: *mut core::ffi::c_void, len: uacpi_size) {
-    let _ = (addr, len);
-    todo!("Undo the corresponding uacpi_kernel_map.")
+    let virt_base = VirtualAddress::from_mut(addr);
+    let start_frame = &virt_base.prev_aligned_to(PageSize::Standard.num_bytes());
+    let end_frame = &virt_base.add(len).next_aligned_to(PageSize::Standard.num_bytes());
+    let num_frames = (*end_frame - *start_frame) as usize / PageSize::Standard.num_bytes();
+
+    let mut kas = KERNEL_AS.lock();
+    for n in 0..num_frames {
+        kas.unmap_page(virt_base + n * PageSize::Standard.num_bytes())
+            .expect("[ACPI][uACPI] Failed to unmap a region from the kernel address space.");
+    }
 }
 
 /* ------------------------------------------------------------------------------------------- *
@@ -134,15 +168,31 @@ pub unsafe extern "C" fn uacpi_kernel_pci_device_open(
     address: uacpi_pci_address,
     out_handle: *mut uacpi_handle,
 ) -> uacpi_status {
-    let _ = (address, out_handle);
-    todo!("Resolve the segment/bus/device/function to a PCIe configuration space handle.")
+    let location = PcieLocation::new(
+        address.segment,
+        address.bus,
+        PcieDeviceNum::try_from(address.device)
+            .expect("[ACPI][uACPI] uACPI attempted to use an invalid PCIe device number."),
+        PcieFunctionNum::try_from(address.function)
+            .expect("[ACPI][uACPI] uACPI attempted to use an invalid PCIe function number."),
+    );
+    match DEVICE_TOPOLOGY.pcie.get_cfg_space_vaddr(location) {
+        Ok(vaddr) => {
+            unsafe {
+                out_handle.write(vaddr.into_mut() as *mut core::ffi::c_void);
+            }
+            UACPI_STATUS_OK
+        }
+        Err(_) => UACPI_STATUS_INVALID_ARGUMENT,
+    }
 }
 
 /// Closes a handle returned by [`uacpi_kernel_pci_device_open`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_pci_device_close(device: uacpi_handle) {
+    /* Since the used handle is just a raw pointer to the beginning of the PCI configuration
+     * space, there is nothing to do here. */
     let _ = device;
-    todo!("Release the configuration space handle.")
 }
 
 #[unsafe(no_mangle)]
@@ -151,8 +201,11 @@ pub unsafe extern "C" fn uacpi_kernel_pci_read8(
     offset: uacpi_size,
     value: *mut uacpi_u8,
 ) -> uacpi_status {
-    let _ = (device, offset, value);
-    todo!("Read one byte of PCI configuration space.")
+    let target = (device as *mut u8).wrapping_add(offset);
+    unsafe {
+        value.write(target.read_volatile());
+    }
+    UACPI_STATUS_OK
 }
 
 #[unsafe(no_mangle)]
@@ -161,8 +214,11 @@ pub unsafe extern "C" fn uacpi_kernel_pci_read16(
     offset: uacpi_size,
     value: *mut uacpi_u16,
 ) -> uacpi_status {
-    let _ = (device, offset, value);
-    todo!("Read one word of PCI configuration space.")
+    let target = (device as *mut u16).wrapping_add(offset);
+    unsafe {
+        value.write(target.read_volatile());
+    }
+    UACPI_STATUS_OK
 }
 
 #[unsafe(no_mangle)]
@@ -171,8 +227,11 @@ pub unsafe extern "C" fn uacpi_kernel_pci_read32(
     offset: uacpi_size,
     value: *mut uacpi_u32,
 ) -> uacpi_status {
-    let _ = (device, offset, value);
-    todo!("Read one dword of PCI configuration space.")
+    let target = (device as *mut u32).wrapping_add(offset);
+    unsafe {
+        value.write(target.read_volatile());
+    }
+    UACPI_STATUS_OK
 }
 
 #[unsafe(no_mangle)]
@@ -181,8 +240,11 @@ pub unsafe extern "C" fn uacpi_kernel_pci_write8(
     offset: uacpi_size,
     value: uacpi_u8,
 ) -> uacpi_status {
-    let _ = (device, offset, value);
-    todo!("Write one byte of PCI configuration space.")
+    let target = (device as *mut u8).wrapping_add(offset);
+    unsafe {
+        target.write_volatile(value);
+    }
+    UACPI_STATUS_OK
 }
 
 #[unsafe(no_mangle)]
@@ -191,8 +253,11 @@ pub unsafe extern "C" fn uacpi_kernel_pci_write16(
     offset: uacpi_size,
     value: uacpi_u16,
 ) -> uacpi_status {
-    let _ = (device, offset, value);
-    todo!("Write one word of PCI configuration space.")
+    let target = (device as *mut u16).wrapping_add(offset);
+    unsafe {
+        target.write_volatile(value);
+    }
+    UACPI_STATUS_OK
 }
 
 #[unsafe(no_mangle)]
@@ -201,8 +266,11 @@ pub unsafe extern "C" fn uacpi_kernel_pci_write32(
     offset: uacpi_size,
     value: uacpi_u32,
 ) -> uacpi_status {
-    let _ = (device, offset, value);
-    todo!("Write one dword of PCI configuration space.")
+    let target = (device as *mut u32).wrapping_add(offset);
+    unsafe {
+        target.write_volatile(value);
+    }
+    UACPI_STATUS_OK
 }
 
 /* ------------------------------------------------------------------------------------------- *
@@ -220,15 +288,27 @@ pub unsafe extern "C" fn uacpi_kernel_io_map(
     len: uacpi_size,
     out_handle: *mut uacpi_handle,
 ) -> uacpi_status {
-    let _ = (base, len, out_handle);
-    todo!("Claim the SystemIO range and hand back a handle describing it.")
+    let region = IoRegion {
+        base: base as u16,
+        len: len as u16,
+    };
+    if overlaps_acpi_claimed(region) {
+        UACPI_STATUS_ALREADY_EXISTS
+    } else {
+        ACPI_CLAIMED_IO_REGIONS.write().insert(region);
+        let handle = Box::new(region);
+        unsafe {
+            out_handle.write(Box::into_raw(handle) as *mut c_void);
+        }
+        UACPI_STATUS_OK
+    }
 }
 
 /// Releases a range claimed by [`uacpi_kernel_io_map`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_io_unmap(handle: uacpi_handle) {
-    let _ = handle;
-    todo!("Release the SystemIO range.")
+    let region = unsafe { Box::from_raw(handle as *mut IoRegion) };
+    ACPI_CLAIMED_IO_REGIONS.write().remove(&*region);
 }
 
 #[unsafe(no_mangle)]
@@ -237,8 +317,16 @@ pub unsafe extern "C" fn uacpi_kernel_io_read8(
     offset: uacpi_size,
     out_value: *mut uacpi_u8,
 ) -> uacpi_status {
-    let _ = (handle, offset, out_value);
-    todo!("Read one byte from the mapped SystemIO range, as a single access of exactly that width.")
+    let region = unsafe { &*(handle as *mut IoRegion) };
+
+    if offset >= region.len as uacpi_size {
+        UACPI_STATUS_INVALID_ARGUMENT
+    } else {
+        unsafe {
+            out_value.write(isa::io::in8(region.base.wrapping_add(offset as u16)));
+        }
+        UACPI_STATUS_OK
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -247,8 +335,16 @@ pub unsafe extern "C" fn uacpi_kernel_io_read16(
     offset: uacpi_size,
     out_value: *mut uacpi_u16,
 ) -> uacpi_status {
-    let _ = (handle, offset, out_value);
-    todo!("Read one word from the mapped SystemIO range, as a single access of exactly that width.")
+    let region = unsafe { &*(handle as *mut IoRegion) };
+
+    if offset >= region.len as uacpi_size {
+        UACPI_STATUS_INVALID_ARGUMENT
+    } else {
+        unsafe {
+            out_value.write(isa::io::in16(region.base.wrapping_add(offset as u16)));
+        }
+        UACPI_STATUS_OK
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -257,10 +353,16 @@ pub unsafe extern "C" fn uacpi_kernel_io_read32(
     offset: uacpi_size,
     out_value: *mut uacpi_u32,
 ) -> uacpi_status {
-    let _ = (handle, offset, out_value);
-    todo!(
-        "Read one dword from the mapped SystemIO range, as a single access of exactly that width."
-    )
+    let region = unsafe { &*(handle as *mut IoRegion) };
+
+    if offset >= region.len as uacpi_size {
+        UACPI_STATUS_INVALID_ARGUMENT
+    } else {
+        unsafe {
+            out_value.write(isa::io::in32(region.base.wrapping_add(offset as u16)));
+        }
+        UACPI_STATUS_OK
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -269,8 +371,14 @@ pub unsafe extern "C" fn uacpi_kernel_io_write8(
     offset: uacpi_size,
     in_value: uacpi_u8,
 ) -> uacpi_status {
-    let _ = (handle, offset, in_value);
-    todo!("Write one byte to the mapped SystemIO range, as a single access of exactly that width.")
+    let region = unsafe { &*(handle as *mut IoRegion) };
+
+    if offset >= region.len as uacpi_size {
+        UACPI_STATUS_INVALID_ARGUMENT
+    } else {
+        isa::io::out8(region.base.wrapping_add(offset as u16), in_value);
+        UACPI_STATUS_OK
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -279,8 +387,15 @@ pub unsafe extern "C" fn uacpi_kernel_io_write16(
     offset: uacpi_size,
     in_value: uacpi_u16,
 ) -> uacpi_status {
-    let _ = (handle, offset, in_value);
-    todo!("Write one word to the mapped SystemIO range, as a single access of exactly that width.")
+    let region = unsafe { &*(handle as *mut IoRegion) };
+
+    if offset >= region.len as uacpi_size {
+        UACPI_STATUS_INVALID_ARGUMENT
+    } else {
+        isa::io::out16(region.base.wrapping_add(offset as u16), in_value);
+
+        UACPI_STATUS_OK
+    }
 }
 
 #[unsafe(no_mangle)]
@@ -289,8 +404,15 @@ pub unsafe extern "C" fn uacpi_kernel_io_write32(
     offset: uacpi_size,
     in_value: uacpi_u32,
 ) -> uacpi_status {
-    let _ = (handle, offset, in_value);
-    todo!("Write one dword to the mapped SystemIO range, as a single access of exactly that width.")
+    let region = unsafe { &*(handle as *mut IoRegion) };
+
+    if offset >= region.len as uacpi_size {
+        UACPI_STATUS_INVALID_ARGUMENT
+    } else {
+        isa::io::out32(region.base.wrapping_add(offset as u16), in_value);
+
+        UACPI_STATUS_OK
+    }
 }
 
 /* ------------------------------------------------------------------------------------------- *

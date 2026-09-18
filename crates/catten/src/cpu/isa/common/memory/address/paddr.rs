@@ -161,6 +161,21 @@ impl Sub<usize> for PhysicalAddress {
     }
 }
 
+impl Sub<PhysicalAddress> for PhysicalAddress {
+    type Output = isize;
+
+    fn sub(self, rhs: PhysicalAddress) -> Self::Output {
+        let unsigned_res = self.raw.abs_diff(rhs.raw);
+        let signed_res = unsigned_res as isize
+            * if rhs.raw > self.raw {
+                -1
+            } else {
+                1
+            };
+        signed_res
+    }
+}
+
 impl Default for PhysicalAddress {
     fn default() -> Self {
         PhysicalAddress {
