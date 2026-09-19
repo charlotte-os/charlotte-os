@@ -29,9 +29,11 @@
 //! [`uacpi_setup_early_table_access`](uacpi_wrapper::uacpi_setup_early_table_access) or
 //! [`uacpi_initialize`](uacpi_wrapper::uacpi_initialize) until the functions the chosen
 //! initialisation level depends on are real.
+mod c_alloc;
 mod io;
 
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use core::ffi::c_void;
 use core::ops::Add;
 
@@ -61,18 +63,28 @@ use uacpi_wrapper::{
 
 use crate::cpu::isa;
 use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
+use crate::cpu::isa::interface::timers::LpTimerIfce;
+use crate::cpu::isa::timers::LpTimer;
+use crate::cpu::isa::timers::tsc::TSC_FREQUENCY_HZ;
+use crate::cpu::multiprocessor::interrupt_tracking::INT_STATE;
+use crate::cpu::scheduler::system_scheduler::{SYSTEM_SCHEDULER, get_thread_id};
+use crate::cpu::scheduler::threads::waker::Waker;
 use crate::device_management::drivers::busses::pci_express::topology::{
     PcieDeviceNum,
     PcieFunctionNum,
     PcieLocation,
 };
 use crate::device_management::topology::DEVICE_TOPOLOGY;
+use crate::klib::constants::NANOS_PER_SEC;
+use crate::klib::observer::Observable;
+use crate::klib::time::duration::ExtDuration;
 use crate::log;
 use crate::memory::allocators::memory::PageSize;
 use crate::memory::linear::PageType;
 use crate::memory::linear::address_map::LA_MAP;
 use crate::memory::linear::address_map::RegionType::{KernelAllocatorArena, KernelMmio};
 use crate::memory::{AddressSpaceInterface, KERNEL_AS, PhysicalAddress, VirtualAddress};
+use crate::timers::{TIMER_QUEUES, TimerEvent};
 
 /* ------------------------------------------------------------------------------------------- *
  * Table discovery                                                                              *
@@ -426,15 +438,13 @@ pub unsafe extern "C" fn uacpi_kernel_io_write32(
 /// `UACPI_SIZED_FREES` and so passes no size back.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_alloc(size: uacpi_size) -> *mut core::ffi::c_void {
-    let _ = size;
-    todo!("Allocate from the kernel heap, recording whatever `free` will need to reverse it.")
+    c_alloc::malloc(size)
 }
 
 /// Frees a pointer previously returned by [`uacpi_kernel_alloc`]. Null is a no-op.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_free(mem: *mut core::ffi::c_void) {
-    let _ = mem;
-    todo!("Return the allocation to the kernel heap.")
+    c_alloc::free(mem);
 }
 
 /* ------------------------------------------------------------------------------------------- *
@@ -444,21 +454,30 @@ pub unsafe extern "C" fn uacpi_kernel_free(mem: *mut core::ffi::c_void) {
 /// Returns a monotonic nanosecond count since boot.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_get_nanoseconds_since_boot() -> uacpi_u64 {
-    todo!("Read the monotonic system timer.")
+    (LpTimer::now() / *TSC_FREQUENCY_HZ) * NANOS_PER_SEC as u64
 }
 
 /// Busy-waits for at least `usec` microseconds without yielding.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_stall(usec: uacpi_u8) {
-    let _ = usec;
-    todo!("Spin for the requested number of microseconds.")
+    let start_timestamp = LpTimer::now();
+    while (LpTimer::now() - start_timestamp) < (*TSC_FREQUENCY_HZ / 1_000_000 * usec as u64) {
+        core::hint::spin_loop();
+    }
 }
 
 /// Sleeps for at least `msec` milliseconds, yielding if the kernel can.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_sleep(msec: uacpi_u64) {
-    let _ = msec;
-    todo!("Sleep for the requested number of milliseconds.")
+    let wake_event = TimerEvent::from(ExtDuration::from_millis(msec as u128));
+    SYSTEM_SCHEDULER
+        .write()
+        .block_thread(
+            get_thread_id().expect("[ACPI][uACPI] Attempted to sleep from a non-thread context."),
+            &wake_event,
+        )
+        .expect("[ACPI][uACPI] Error blocking thread");
+    TIMER_QUEUES.get_mut().add_event(wake_event);
 }
 
 /* ------------------------------------------------------------------------------------------- *
@@ -544,21 +563,26 @@ pub unsafe extern "C" fn uacpi_kernel_reset_event(handle: uacpi_handle) {
 /// thread" sentinel.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_get_thread_id() -> uacpi_thread_id {
-    todo!("Return a per-thread identifier that is never the all-ones sentinel.")
+    if let Some(thread_id) = get_thread_id() {
+        thread_id as uacpi_thread_id
+    } else {
+        usize::MAX as uacpi_thread_id
+    }
 }
 
 /// Disables interrupts on the calling LP and returns the prior state for
 /// [`uacpi_kernel_restore_interrupts`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_disable_interrupts() -> uacpi_interrupt_state {
-    todo!("Mask interrupts on this LP and return the previous state.")
+    INT_STATE.save_int();
+    0
 }
 
 /// Restores the interrupt state captured by [`uacpi_kernel_disable_interrupts`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_restore_interrupts(state: uacpi_interrupt_state) {
     let _ = state;
-    todo!("Restore the interrupt state this LP had before it was masked.")
+    INT_STATE.restore_int();
 }
 
 /* ------------------------------------------------------------------------------------------- *
