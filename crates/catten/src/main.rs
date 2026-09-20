@@ -96,6 +96,8 @@ pub extern "C" fn bsp_main() -> ! {
     logln!("Spawning thread to enumerate IOAPICs...");
     let ioapic_enumeration_thread_id = spawn_thread(KERNEL_ASID, print_ioapic_info);
     logln!("IOAPIC enumeration thread spawned with ID = {ioapic_enumeration_thread_id}.");
+    let acpi_init_thread = spawn_thread(KERNEL_ASID, initialize_acpi);
+    logln!("ACPI initialization thread spawned with ID = {acpi_init_thread}.");
     // for _ in 0..(get_lp_count() * 2) {
     //     logln!("Spawning additional kernel threads to test scheduler...");
     //     let thread_id = spawn_thread(KERNEL_ASID, test_fn);
@@ -169,4 +171,11 @@ pub extern "C" fn test_fn() {
     loop {
         logln!("Logging from thread {thread_id} on LP {lp_id}!");
     }
+}
+
+#[cfg(feature = "acpi")]
+#[unsafe(no_mangle)]
+pub extern "C" fn initialize_acpi() {
+    crate::environment::acpi::aml::initialize_acpi();
+    logln!("LP {}: ACPI initialization complete.", (get_lp_id()));
 }
