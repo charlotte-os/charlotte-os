@@ -29,6 +29,11 @@ pub trait LpTimerIfce {
     // Timestamp functions
     fn now() -> Self::Timestamp;
     fn get_ts_cycle_period() -> ExtDuration;
+    /// Convert a counter value without discarding its sub-second component.
+    fn timestamp_to_nanos(timestamp: u64) -> u64 {
+        ((timestamp as u128 * Self::get_ts_cycle_period().as_picos()) / 1_000).min(u64::MAX as u128)
+            as u64
+    }
     // Timer Interrupt Source functions
     fn get_int_resolution(&self) -> Result<ExtDuration, LpTimerError>;
     fn set_divisor(&mut self, divisor: Self::Divisor) -> Result<(), LpTimerError>;

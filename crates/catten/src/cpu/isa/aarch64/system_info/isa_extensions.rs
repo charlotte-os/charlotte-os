@@ -28,12 +28,12 @@ pub(in crate::cpu::isa::aarch64::system_info) mod check_feat {
             core::arch::asm!("mrs {}, id_aa64mmfr1_el1", out(reg) id_aa64mmfr1_el1);
         }
         const ID_AA64MMFR1_EL1_D128_SHIFT: u64 = 32;
-        const ID_AA64MMFR1_EL1_D128_MASK: u64 = 0b1111 << ID_AA64MMFR1_EL1_D128_SHIFT;
+        const ID_AA64MMFR1_EL1_D128_MASK: u64 = 0b1111;
         const ID_AA64MMFR1_EL1_D128_VAL: u64 = 0b0001;
         mask_shift_cmp(
             id_aa64mmfr1_el1,
+            ID_AA64MMFR1_EL1_D128_SHIFT as u8,
             ID_AA64MMFR1_EL1_D128_MASK,
-            ID_AA64MMFR1_EL1_D128_SHIFT,
             ID_AA64MMFR1_EL1_D128_VAL,
         )
     }
@@ -44,12 +44,12 @@ pub(in crate::cpu::isa::aarch64::system_info) mod check_feat {
             core::arch::asm!("mrs {}, id_aa64mmfr0_el1", out(reg) id_aa64mmfr0_el1);
         }
         const ID_AA64MMFR0_EL1_LPA_SHIFT: u64 = 0;
-        const ID_AA64MMFR0_EL1_LPA_MASK: u64 = 0b1111 << ID_AA64MMFR0_EL1_LPA_SHIFT;
+        const ID_AA64MMFR0_EL1_LPA_MASK: u64 = 0b1111;
         const ID_AA64MMFR0_EL1_LPA_VAL: u64 = 0b0110;
         mask_shift_cmp(
             id_aa64mmfr0_el1,
+            ID_AA64MMFR0_EL1_LPA_SHIFT as u8,
             ID_AA64MMFR0_EL1_LPA_MASK,
-            ID_AA64MMFR0_EL1_LPA_SHIFT,
             ID_AA64MMFR0_EL1_LPA_VAL,
         )
     }
@@ -60,12 +60,12 @@ pub(in crate::cpu::isa::aarch64::system_info) mod check_feat {
             core::arch::asm!("mrs {}, id_aa64mmfr0_el1", out(reg) id_aa64mmfr0_el1);
         }
         const ID_AA64MMFR0_EL1_LPA2_SHIFT: u64 = 28;
-        const ID_AA64MMFR0_EL1_LPA2_MASK: u64 = 0b1111 << ID_AA64MMFR0_EL1_LPA2_SHIFT;
+        const ID_AA64MMFR0_EL1_LPA2_MASK: u64 = 0b1111;
         const ID_AA64MMFR0_EL1_LPA2_VAL: u64 = 0b0001;
         mask_shift_cmp(
             id_aa64mmfr0_el1,
+            ID_AA64MMFR0_EL1_LPA2_SHIFT as u8,
             ID_AA64MMFR0_EL1_LPA2_MASK,
-            ID_AA64MMFR0_EL1_LPA2_SHIFT,
             ID_AA64MMFR0_EL1_LPA2_VAL,
         )
     }
@@ -77,12 +77,12 @@ pub(in crate::cpu::isa::aarch64::system_info) mod check_feat {
         }
         // ARM ARM D24.2.80
         const ID_AA64PFR0_EL1_NMI_SHIFT: u64 = 36;
-        const ID_AA64PFR0_EL1_NMI_MASK: u64 = 0b1111 << ID_AA64PFR0_EL1_NMI_SHIFT;
+        const ID_AA64PFR0_EL1_NMI_MASK: u64 = 0b1111;
         const ID_AA64PFR0_EL1_NMI_VAL: u64 = 0b0001;
         mask_shift_cmp(
             id_aa64pfr1_el1,
+            ID_AA64PFR0_EL1_NMI_SHIFT as u8,
             ID_AA64PFR0_EL1_NMI_MASK,
-            ID_AA64PFR0_EL1_NMI_SHIFT,
             ID_AA64PFR0_EL1_NMI_VAL,
         )
     }
@@ -93,12 +93,12 @@ pub(in crate::cpu::isa::aarch64::system_info) mod check_feat {
             core::arch::asm!("mrs {}, id_aa64mmfr2_el1", out(reg) id_aa64mmfr2_el1);
         }
         const ID_AA64MMFR2_EL1_LVA_SHIFT: u64 = 16;
-        const ID_AA64MMFR2_EL1_LVA_MASK: u64 = 0b1111 << ID_AA64MMFR2_EL1_LVA_SHIFT;
+        const ID_AA64MMFR2_EL1_LVA_MASK: u64 = 0b1111;
         const ID_AA64MMFR2_EL1_LVA_VAL: u64 = 0b0001;
         mask_shift_cmp(
             id_aa64mmfr2_el1,
+            ID_AA64MMFR2_EL1_LVA_SHIFT as u8,
             ID_AA64MMFR2_EL1_LVA_MASK,
-            ID_AA64MMFR2_EL1_LVA_SHIFT,
             ID_AA64MMFR2_EL1_LVA_VAL,
         )
     }
@@ -109,12 +109,12 @@ pub(in crate::cpu::isa::aarch64::system_info) mod check_feat {
             core::arch::asm!("mrs {}, id_aa64mmfr2_el1", out(reg) id_aa64mmfr2_el1);
         }
         const ID_AA64MMFR2_EL1_LVA3_SHIFT: u64 = 16;
-        const ID_AA64MMFR2_EL1_LVA3_MASK: u64 = 0b1111 << ID_AA64MMFR2_EL1_LVA3_SHIFT;
+        const ID_AA64MMFR2_EL1_LVA3_MASK: u64 = 0b1111;
         const ID_AA64MMFR2_EL1_LVA3_VAL: u64 = 0b0010;
         mask_shift_cmp(
             id_aa64mmfr2_el1,
+            ID_AA64MMFR2_EL1_LVA3_SHIFT as u8,
             ID_AA64MMFR2_EL1_LVA3_MASK,
-            ID_AA64MMFR2_EL1_LVA3_SHIFT,
             ID_AA64MMFR2_EL1_LVA3_VAL,
         )
     }

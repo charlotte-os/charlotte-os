@@ -7,6 +7,9 @@ use core::arch::{asm, global_asm};
 
 pub use gic::LocalIntCtlr;
 
+use crate::cpu::isa::lp::ops::get_lp_id;
+use crate::early_logln;
+
 // Include the exception vector table assembly
 global_asm!(include_str!("evt.asm"));
 
@@ -45,10 +48,15 @@ pub extern "C" fn sync_dispatcher() {
     unsafe {
         asm!("mrs {}, esr_el1", out(reg) esr_el1);
     }
-    early_logln!("LP {}:Synchronous exception occurred with ESR_EL1 = {:#x}", get_lp_id(), esr_el1);
+    early_logln!(
+        "LP {}:Synchronous exception occurred with ESR_EL1 = {:#x}",
+        (get_lp_id()),
+        esr_el1
+    );
     const EC_NUM_BITS: u64 = 6;
     const EC_SHIFT: u64 = 26;
-    let exception_class = bitwise::mask_shift_read(esr_el1, (1 << EC_NUM_BITS) - 1, EC_SHIFT);
+    let exception_class =
+        crate::klib::bitwise::read_subfield(esr_el1, EC_SHIFT as u8, (1 << EC_NUM_BITS) - 1);
     early_logln!("Exception class = {:#x}", exception_class);
 }
 #[unsafe(no_mangle)]

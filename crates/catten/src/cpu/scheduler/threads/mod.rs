@@ -34,6 +34,8 @@ pub struct Thread {
     pub context: ThreadContext,
     pub asid: AddressSpaceId,
     pub state: ThreadState,
+    /// A pinned thread must keep its processor after every wakeup.
+    pub affinity: Option<LpId>,
     exit_observers: spin::Mutex<Vec<Weak<dyn Observer>>>,
 }
 
@@ -51,6 +53,7 @@ impl Thread {
             },
             asid,
             state: ThreadState::NeedsLpAssignment,
+            affinity: None,
             exit_observers: spin::Mutex::new(Vec::new()),
         }
     }

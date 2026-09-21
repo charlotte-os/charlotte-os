@@ -15,9 +15,8 @@ use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
 use crate::klib::time::duration::ExtDuration;
 
-pub static APIC_TIMERS: LazyLock<Vec<Arc<Mutex<ApicTimer>>>> = LazyLock::new(|| {
-    vec![Arc::new(Mutex::new(ApicTimer::new(LAPIC_TIMER_VECTOR))); get_lp_count() as usize]
-});
+pub static APIC_TIMERS: LazyLock<Vec<spin::Once<Arc<Mutex<ApicTimer>>>>> =
+    LazyLock::new(|| (0..get_lp_count()).map(|_| spin::Once::new()).collect());
 
 pub type LpTimer = ApicTimer;
 
@@ -104,7 +103,9 @@ impl LpTimerIfce for ApicTimer {
     const NAME: &'static str = "x86-64 x2APIC Timer";
 
     fn get() -> Arc<Mutex<Self>> {
-        APIC_TIMERS[get_lp_id() as usize].clone()
+        APIC_TIMERS[get_lp_id() as usize]
+            .call_once(|| Arc::new(Mutex::new(ApicTimer::new(LAPIC_TIMER_VECTOR))))
+            .clone()
     }
 
     fn now() -> Self::Timestamp {
@@ -113,6 +114,11 @@ impl LpTimerIfce for ApicTimer {
 
     fn get_ts_cycle_period() -> ExtDuration {
         *TSC_CYCLE_PERIOD
+    }
+
+    fn timestamp_to_nanos(timestamp: u64) -> u64 {
+        ((timestamp as u128 * 1_000_000_000) / *super::tsc::TSC_FREQUENCY_HZ as u128)
+            .min(u64::MAX as u128) as u64
     }
 
     fn get_int_resolution(&self) -> Result<ExtDuration, LpTimerError> {
@@ -146,7 +152,9 @@ impl LpTimerIfce for ApicTimer {
         let duration_until_deadline = ExtDuration::from_picos(
             (deadline - current_time) as u128 * TSC_CYCLE_PERIOD.as_picos(),
         );
-        self.set_duration(duration_until_deadline)
+        let ticks = duration_until_deadline.as_picos().div_ceil(self.resolution.as_picos());
+        self.reset_value = ticks.clamp(1, u32::MAX as u128) as u32;
+        Ok(())
     }
 
     fn get_duration(&self) -> Result<ExtDuration, LpTimerError> {

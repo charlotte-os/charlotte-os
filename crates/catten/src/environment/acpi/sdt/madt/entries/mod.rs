@@ -48,7 +48,7 @@ unsafe impl Send for MadtEntryIndex {}
 #[repr(C, packed)]
 pub(super) struct MadtEntryGeneric {
     entry_type: u8,
-    entry_length: u8,
+    pub(super) entry_length: u8,
     // ...rest of the entry based on the specific type
 }
 
@@ -77,17 +77,23 @@ impl Iterator for MadtEntryIter {
     type Item = NonNull<MadtEntryGeneric>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(nn_ptr) = self.ptr {
-            let entry_length = unsafe { nn_ptr.read() }.entry_length;
-            if VirtualAddress::from_ptr(unsafe { nn_ptr.as_ptr().byte_add(entry_length as usize) })
-                >= self.end_ptr
-            {
-                self.ptr = None;
-            } else {
-                self.ptr = NonNull::new(unsafe { nn_ptr.as_ptr().byte_add(entry_length as usize) });
-            }
+        let current = self.ptr?;
+        let start = VirtualAddress::from_ptr(current.as_ptr());
+        if start + core::mem::size_of::<MadtEntryGeneric>() > self.end_ptr {
+            self.ptr = None;
+            return None;
         }
-        self.ptr
+        let length = unsafe { current.read_unaligned() }.entry_length as usize;
+        if length < core::mem::size_of::<MadtEntryGeneric>() || start + length > self.end_ptr {
+            self.ptr = None;
+            return None;
+        }
+        self.ptr = if start + length == self.end_ptr {
+            None
+        } else {
+            NonNull::new(unsafe { current.as_ptr().byte_add(length) })
+        };
+        Some(current)
     }
 }
 

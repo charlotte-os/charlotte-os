@@ -111,6 +111,7 @@ impl PageTableEntry {
     }
 
     pub fn set_pat_index_bits(&mut self, pat_index: u8) -> &mut Self {
+        self.0 &= !((1 << PAT_INDEX_0) | (1 << PAT_INDEX_1) | (1 << PAT_INDEX_2_STANDARD));
         self.0 |= ((pat_index as u64 & 1) << PAT_INDEX_0) as u64;
         self.0 |= ((pat_index as u64 & 1 << 1) << PAT_INDEX_1 - 1) as u64;
         self.0 |= ((pat_index as u64 & 1 << 2) << PAT_INDEX_2_STANDARD - 2) as u64;
@@ -118,6 +119,7 @@ impl PageTableEntry {
     }
 
     pub fn set_pat_index_bits_large_huge(&mut self, pat_index: u8) -> &mut Self {
+        self.0 &= !((1 << PAT_INDEX_0) | (1 << PAT_INDEX_1) | (1 << PAT_INDEX_2_LARGE_HUGE));
         self.0 |= ((pat_index as u64 & 1) << PAT_INDEX_0) as u64;
         self.0 |= ((pat_index as u64 & 1 << 1) << PAT_INDEX_1 - 1) as u64;
         self.0 |= ((pat_index as u64 & 1 << 2) << PAT_INDEX_2_LARGE_HUGE - 2) as u64;

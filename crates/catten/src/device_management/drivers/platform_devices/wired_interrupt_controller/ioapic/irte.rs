@@ -18,6 +18,23 @@ pub enum DeliveryMode {
 }
 
 impl Irte {
+    pub(super) fn new(
+        vector: u8,
+        destination: u8,
+        active_low: bool,
+        level: bool,
+        masked: bool,
+    ) -> Self {
+        let mut entry = Self(0);
+        entry.set_vector(vector);
+        entry.set_delivery_mode(DeliveryMode::Fixed);
+        entry.set_pin_polarity(active_low);
+        entry.set_trigger_mode(level);
+        entry.set_mask_bit(masked);
+        entry.set_dest_apic_id(destination);
+        entry
+    }
+
     fn set_vector(&mut self, vector: u8) {
         const VECTOR_SHIFT: u8 = 0;
         const VECTOR_MASK: u64 = 0xff << VECTOR_SHIFT;
@@ -60,7 +77,7 @@ impl Irte {
         splice_into(&mut self.0, latched as u64, TRIGGER_MODE_MASK, TRIGGER_MODE_SHIFT).unwrap();
     }
 
-    fn set_mask_bit(&mut self, mask_bit: bool) {
+    pub(super) fn set_mask_bit(&mut self, mask_bit: bool) {
         const MASK_BIT_SHIFT: u8 = 16;
         const MASK_BIT_MASK: u64 = 0b1 << MASK_BIT_SHIFT;
         splice_into(&mut self.0, mask_bit as u64, MASK_BIT_MASK, MASK_BIT_SHIFT).unwrap();
@@ -68,7 +85,7 @@ impl Irte {
 
     fn set_dest_apic_id(&mut self, dest: u8) {
         const DEST_APIC_ID_SHIFT: u8 = 56;
-        const DEST_APIC_ID_MASK: u64 = 0x0f << DEST_APIC_ID_SHIFT;
+        const DEST_APIC_ID_MASK: u64 = 0xff << DEST_APIC_ID_SHIFT;
         splice_into(&mut self.0, dest as u64, DEST_APIC_ID_MASK, DEST_APIC_ID_SHIFT).unwrap();
     }
 

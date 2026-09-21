@@ -20,7 +20,8 @@ use crate::cpu::isa::{self};
 use crate::device_management::drivers::busses::pci_express::topology::PcieLocation;
 use crate::device_management::drivers::busses::pci_express::{self};
 
-pub type InterruptHandler = extern "C" fn();
+/// The vector/source discriminator is supplied by the architecture dispatcher.
+pub type InterruptHandler = extern "C" fn(IntSrcDscr);
 
 pub enum Error {
     InterruptVectorsExhausted,

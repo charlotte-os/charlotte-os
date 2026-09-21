@@ -22,7 +22,9 @@ uACPI is only half a library. Every declaration in `uacpi/kernel_api.h` is a fun
 owes uACPI* — 46 of them at this version — and this crate supplies none of them. Anything that
 links it has to define them all with `#[unsafe(no_mangle)]` or the link fails with one undefined
 reference per missing function. In this workspace that is
-`catten::environment::acpi::uacpi_host`.
+`catten::environment::acpi::aml::uacpi_host`. The host implementation and its scheduler,
+interrupt routing, and timer dependencies are part of Catten; they are not C library stubs.
+See [kernel integration](../catten/src/environment/acpi/doc.md) for startup and validation.
 
 ## Build requirements
 

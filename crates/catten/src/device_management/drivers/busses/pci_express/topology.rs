@@ -124,13 +124,11 @@ impl PcieTopology {
         let segment_group = self
             .segments
             .iter()
-            .find(|sg| sg.pcie_segment_group_num == location.segment_group)
+            .find(|sg| {
+                sg.pcie_segment_group_num == location.segment_group
+                    && (sg.start_bus_num..=sg.end_bus_num).contains(&location.bus_segment)
+            })
             .ok_or(Error::InvalidLocation)?;
-        if location.bus_segment < segment_group.start_bus_num
-            || location.bus_segment > segment_group.end_bus_num
-        {
-            return Err(Error::InvalidLocation);
-        }
         Ok(segment_group.ecam_vaddr + location.get_ecam_offset())
     }
 }

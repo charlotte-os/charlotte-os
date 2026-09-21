@@ -5,6 +5,7 @@ use crate::environment::boot_protocol::limine::RSDP_REQUEST;
 use crate::memory::{AddressSpace, AddressSpaceInterface, PhysicalAddress, VirtualAddress};
 
 #[doc = include_str!("doc.md")]
+#[cfg(feature = "acpi")]
 pub mod aml;
 pub mod sdt;
 pub mod table_map;

@@ -41,15 +41,15 @@ impl ExtDuration {
     }
 
     pub fn as_millis(&self) -> u128 {
-        self.picos / MILLIS_PER_SEC
+        self.picos / (PICOS_PER_SEC / MILLIS_PER_SEC)
     }
 
     pub fn as_micros(&self) -> u128 {
-        self.picos / MICROS_PER_SEC
+        self.picos / (PICOS_PER_SEC / MICROS_PER_SEC)
     }
 
     pub fn as_nanos(&self) -> u128 {
-        self.picos / NANOS_PER_SEC
+        self.picos / (PICOS_PER_SEC / NANOS_PER_SEC)
     }
 
     pub fn as_picos(&self) -> u128 {

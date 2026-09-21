@@ -17,6 +17,7 @@
 
 mod chars;
 pub mod early;
+#[cfg(feature = "display")]
 pub mod flanterm;
 
 /// Logs to the early console only, without a trailing line break.
@@ -48,9 +49,10 @@ macro_rules! early_logln {
 macro_rules! log {
     ($text:expr $(, $arg:tt)*) => ({
         $crate::cpu::multiprocessor::interrupt_tracking::INT_STATE.save_int();
+        #[cfg(feature = "display")]
         {
             use core::fmt::Write;
-            let _ = write!($crate::log::flanterm::FT_CTX.lock(), $text $(, $arg)*);
+            let _ = write!($crate::log::flanterm::context().lock(), $text $(, $arg)*);
         }
         $crate::early_log!($text $(, $arg)*);
         $crate::cpu::multiprocessor::interrupt_tracking::INT_STATE.restore_int();
@@ -67,9 +69,10 @@ macro_rules! log {
 macro_rules! logln {
     ($text:expr $(, $arg:tt)*) => ({
         $crate::cpu::multiprocessor::interrupt_tracking::INT_STATE.save_int();
+        #[cfg(feature = "display")]
         {
             use core::fmt::Write;
-            let mut ft_ctx = $crate::log::flanterm::FT_CTX.lock();
+            let mut ft_ctx = $crate::log::flanterm::context().lock();
             let _ = write!(ft_ctx, $text $(, $arg)*);
             let _ = ft_ctx.write_str("\r\n");
         }

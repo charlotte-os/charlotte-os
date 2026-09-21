@@ -4,6 +4,7 @@ use crate::environment::acpi::sdt::madt::entries::interrupt_flags::InterruptFlag
 
 /// The MADT Interrupt Source Override Structure overlay struct.
 /// Ref: ACPI 6.6 Section 5.2.12.5
+#[repr(C, packed)]
 pub struct InterruptSourceOverrideEntry {
     pub entry_type: MadtEntryType,
     pub length: u8,

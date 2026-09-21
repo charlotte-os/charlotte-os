@@ -62,7 +62,7 @@ unsafe impl Source for ExtendOnOom {
         let new_region_end = new_region_start + PageSize::Large.num_bytes();
         /* Actually allocate and map the new region */
         try_allocate_and_map_range(KERNEL_AS.lock(), new_region_start, PageSize::Large, 1)
-            .expect("Failed to allocate and extend the kernel heap");
+            .map_err(|_| ())?;
         unsafe {
             talc.extend(
                 NonNull::new(curr_end).expect("Passed null pointer to the constructor of NonNull"),

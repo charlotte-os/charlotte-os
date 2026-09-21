@@ -267,7 +267,7 @@ fn parse_xsdt(xsdt_addr: PhysicalAddress) -> HashMap<AcpiTableType, Vec<Physical
             } else {
                 logln!(
                     "[ACPI] Warning: Unrecognized ACPI table with signature {:?} at address {:?}",
-                    (unsafe { String::from_utf8_unchecked(signature.to_vec()) }),
+                    signature,
                     table_addr
                 );
             }

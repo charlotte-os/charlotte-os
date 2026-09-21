@@ -47,7 +47,8 @@ use crate::cpu::isa::timers::print_timer_info;
 use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
-use crate::cpu::scheduler::{spawn_thread, yield_lp};
+use crate::cpu::scheduler::{spawn_thread_on_lp, yield_lp};
+#[cfg(target_arch = "x86_64")]
 use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::IOAPIC_LIST;
 use crate::device_management::topology::DEVICE_TOPOLOGY;
 use crate::memory::KERNEL_ASID;
@@ -90,19 +91,8 @@ pub extern "C" fn bsp_main() -> ! {
         }
     }
     mask_interrupts!();
-    logln!("Spawning initial kernel thread to probe device topology...");
-    let thread_id = spawn_thread(KERNEL_ASID, probe_device_topology);
-    logln!("Initial thread spawned with ID = {thread_id}.");
-    logln!("Spawning thread to enumerate IOAPICs...");
-    let ioapic_enumeration_thread_id = spawn_thread(KERNEL_ASID, print_ioapic_info);
-    logln!("IOAPIC enumeration thread spawned with ID = {ioapic_enumeration_thread_id}.");
-    let acpi_init_thread = spawn_thread(KERNEL_ASID, initialize_acpi);
-    logln!("ACPI initialization thread spawned with ID = {acpi_init_thread}.");
-    // for _ in 0..(get_lp_count() * 2) {
-    //     logln!("Spawning additional kernel threads to test scheduler...");
-    //     let thread_id = spawn_thread(KERNEL_ASID, test_fn);
-    //     logln!("Additional thread spawned with ID = {thread_id}.");
-    // }
+    let thread_id = spawn_thread_on_lp(KERNEL_ASID, initialize_platform, 0);
+    logln!("Platform initialization thread spawned with ID = {thread_id}.");
     unmask_interrupts!();
     logln!("Submitted all initial kernel threads.");
     logln!(
@@ -150,11 +140,9 @@ pub extern "C" fn probe_device_topology() {
     logln!("LP {}: Probing device topology...", (get_lp_id()));
     let device_topology = &*DEVICE_TOPOLOGY;
     logln!("LP {}: Device Topology:\r\n{}", (get_lp_id()), device_topology);
-    loop {
-        yield_lp();
-    }
 }
 
+#[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn print_ioapic_info() {
     logln!("LP {}: Printing IOAPIC information...", (get_lp_id()));
@@ -173,9 +161,16 @@ pub extern "C" fn test_fn() {
     }
 }
 
-#[cfg(feature = "acpi")]
-#[unsafe(no_mangle)]
-pub extern "C" fn initialize_acpi() {
-    crate::environment::acpi::aml::initialize_acpi();
-    logln!("LP {}: ACPI initialization complete.", (get_lp_id()));
+/// Firmware initialization precedes discovery so drivers can safely evaluate AML.
+extern "C" fn initialize_platform() {
+    #[cfg(target_arch = "x86_64")]
+    print_ioapic_info();
+    #[cfg(feature = "acpi")]
+    {
+        crate::environment::acpi::aml::initialize_acpi()
+            .unwrap_or_else(|error| panic!("ACPI initialization failed: {error}"));
+        logln!("LP {}: ACPI initialization complete.", (get_lp_id()));
+    }
+    probe_device_topology();
+    logln!("Platform initialization complete.");
 }

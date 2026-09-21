@@ -1,6 +1,7 @@
 use alloc::fmt::Write;
 use core::ffi::{c_char, c_void};
 use core::ptr::{NonNull, null_mut};
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use ft_wrapper::{
     FLANTERM_FB_ROTATE_0,
@@ -64,6 +65,19 @@ impl Write for FlantermContext {
 
         Ok(())
     }
+}
+
+static CONTEXT_READY: AtomicBool = AtomicBool::new(false);
+
+pub fn context() -> &'static Mutex<FlantermContext> {
+    let context = &*FT_CTX;
+    CONTEXT_READY.store(true, Ordering::Release);
+    context
+}
+
+/// Panic reporting must neither initialize the framebuffer nor wait for its lock.
+pub fn initialized_context() -> Option<&'static Mutex<FlantermContext>> {
+    CONTEXT_READY.load(Ordering::Acquire).then(|| &*FT_CTX)
 }
 
 pub static FT_CTX: LazyLock<Mutex<FlantermContext>> = LazyLock::new(|| {

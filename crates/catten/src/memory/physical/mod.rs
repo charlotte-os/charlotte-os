@@ -308,20 +308,31 @@ fn compute_bitmap_size(mmap: &MemmapResponse) -> usize {
 // Helper functions
 
 fn find_mmap_best_fit(mmap: &MemmapResponse, size: usize) -> Result<PhysicalAddress, Error> {
-    let mut best_fit = PhysicalAddress::try_from(0usize)?;
+    let mut best_fit = None;
     let mut best_fit_size = 0;
     for entry in mmap.entries().iter() {
-        let entry_size = entry.length;
+        // Never place allocator metadata in firmware, ACPI, bootloader, or MMIO
+        // regions. Clearing that memory destroys tables before uACPI sees them.
+        if entry.type_ != MEMMAP_USABLE {
+            continue;
+        }
+        let Some(end) = entry.base.checked_add(entry.length) else {
+            continue;
+        };
+        let base = entry.base.max(PAGE_FRAME_SIZE as u64);
+        let Some(base) = base.checked_add(PAGE_FRAME_SIZE as u64 - 1) else {
+            continue;
+        };
+        let base = base & !(PAGE_FRAME_SIZE as u64 - 1);
+        let Some(entry_size) = end.checked_sub(base) else {
+            continue;
+        };
         if entry_size >= size as u64 && (best_fit_size == 0 || entry_size < best_fit_size) {
-            best_fit = PhysicalAddress::try_from(entry.base as usize)?;
+            best_fit = Some(PhysicalAddress::try_from(base as usize)?);
             best_fit_size = entry_size;
         }
     }
-    if best_fit == PhysicalAddress::try_from(0usize)? {
-        Err(Error::UnableToAllocateTrackingStructure)
-    } else {
-        Ok(best_fit)
-    }
+    best_fit.ok_or(Error::UnableToAllocateTrackingStructure)
 }
 
 fn addr_to_bitmap_index(addr: PhysicalAddress) -> Result<(usize, usize), Error> {

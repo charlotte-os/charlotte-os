@@ -32,8 +32,16 @@
 .global isr_lapic_timer
 isr_lapic_timer:
     m_push_caller_saved
+    push rbp
+    mov rbp, rsp
+    and rsp, ~0xf
+    cld
+    call increment_interrupt_depth
     call signal_eoi
     call process_events
+    call decrement_interrupt_depth
     call cond_yield_lp
+    mov rsp, rbp
+    pop rbp
     m_pop_caller_saved
     iretq

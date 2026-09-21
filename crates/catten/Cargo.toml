@@ -14,6 +14,8 @@ bench = false
 default = ["acpi", "display"]
 
 acpi = ["dep:uacpi-wrapper"]
+# Exercises host services in thread context and installs a QEMU power-button SCI probe.
+acpi_self_test = ["acpi"]
 devicetree = ["dep:flat_device_tree"]
 # If this is disabled all display code will be stripped out to reduce size for headless systems.
 display = ["dep:ft-wrapper"]

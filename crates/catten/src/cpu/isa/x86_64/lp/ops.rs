@@ -152,130 +152,59 @@ pub extern "C" fn set_lp_local_base(base: VirtualAddress) {
 pub extern "C" fn cond_yield_lp() {
     let interrupts_were_enabled = get_int_state();
     mask_interrupts!();
-    #[cfg(feature = "yield_trace")]
-    #[derive(Clone, Copy)]
-    enum YieldTrace {
-        None,
-        NoSwitch {
-            lp_id: LpId,
-        },
-        FromThread {
-            current: usize,
-            next: usize,
-            lp_id: LpId,
-        },
-        FromNonThread {
-            next: usize,
-            lp_id: LpId,
-        },
-    }
-    #[cfg(feature = "yield_trace")]
-    let mut trace = YieldTrace::None;
-    // Collect switch parameters and release all locks before calling switch_ctx.
-    // switch_ctx may permanently abandon the current stack (initial non-thread switch),
-    // so any guards held across it would never be dropped, leaving locks permanently locked.
-    let switch_params: Option<(*mut VirtualAddress, *const VirtualAddress)> = {
-        let sched = SYSTEM_SCHEDULER.read();
-        let mut lsched = sched.get_lp_scheduler().lock();
-        if lsched.is_ctx_switch_pending() {
-            let curr_tid = lsched.get_tid();
-            if let Ok(next_tid) = lsched.next() {
-                if curr_tid.is_some() {
-                    if next_tid != curr_tid.unwrap() {
-                        let (curr_rsp0_ptr, next_rsp0_ptr) = {
-                            let mut tt_guard = MASTER_THREAD_TABLE.write();
-                            let curr_thread = tt_guard
-                                .get_mut(
-                                    curr_tid.expect("Current thread ID not found during yield."),
-                                )
-                                .expect("Current thread not found during yield.");
-                            let curr_rsp0_ptr =
-                                &raw mut curr_thread.context.kernel_stack_buf.curr_sp;
-                            let next_thread = tt_guard
-                                .get_mut(next_tid)
-                                .expect("Next thread not found during yield.");
-                            let next_rsp0_ptr =
-                                &raw mut next_thread.context.kernel_stack_buf.curr_sp;
-                            (curr_rsp0_ptr, next_rsp0_ptr)
-                        };
-                        cfg_select! {
-                            feature = "yield_trace" => {
-                                trace = YieldTrace::FromThread {
-                                    current: curr_tid.unwrap(),
-                                    next: next_tid,
-                                    lp_id: get_lp_id(),
-                                };
-                            }
-                            _ => {}
+    loop {
+        // No scheduler/table guard may survive a switch or the idle instruction.
+        let mut idle = false;
+        let switch_params = {
+            let sched = SYSTEM_SCHEDULER.read();
+            let mut local = sched.get_lp_scheduler().lock();
+            if !local.is_ctx_switch_pending() {
+                None
+            } else {
+                let current = local.get_tid();
+                match local.next() {
+                    Ok(next) => {
+                        local.clear_ctx_switch_pending();
+                        if current == Some(next) {
+                            None
+                        } else {
+                            let mut threads = MASTER_THREAD_TABLE.write();
+                            let saved_stack = current.map_or(core::ptr::null_mut(), |tid| {
+                                &raw mut threads
+                                    .get_mut(tid)
+                                    .unwrap()
+                                    .context
+                                    .kernel_stack_buf
+                                    .curr_sp
+                            });
+                            let next_stack = &raw const threads
+                                .get(next)
+                                .unwrap()
+                                .context
+                                .kernel_stack_buf
+                                .curr_sp;
+                            Some((saved_stack, next_stack))
                         }
-                        lsched.clear_ctx_switch_pending();
-                        Some((curr_rsp0_ptr, next_rsp0_ptr))
-                    } else {
-                        cfg_select! {
-                            feature = "yield_trace" => {
-                                trace = YieldTrace::NoSwitch {
-                                    lp_id: get_lp_id(),
-                                };
-                            }
-                            _ => {}
-                        }
+                    }
+                    Err(_) => {
+                        local.stop();
+                        idle = true;
                         None
                     }
-                } else {
-                    let next_rsp0_ptr = {
-                        let mut tt_guard = MASTER_THREAD_TABLE.write();
-                        let next_thread = tt_guard
-                            .get_mut(next_tid)
-                            .expect("Next thread not found during yield.");
-                        &raw mut next_thread.context.kernel_stack_buf.curr_sp
-                    };
-                    cfg_select! {
-                        feature = "yield_trace" => {
-                            trace = YieldTrace::FromNonThread {
-                                next: next_tid,
-                                lp_id: get_lp_id(),
-                            };
-                        }
-                        _ => {}
-                    }
-                    lsched.clear_ctx_switch_pending();
-                    Some((core::ptr::null_mut(), next_rsp0_ptr))
                 }
-            } else {
-                logln!(
-                    "LP {:?}: No runnable threads found during yield, even though a context \
-                     switch was pending. Awaiting interrupt...",
-                    (get_lp_id())
-                );
-                await_interrupt!();
             }
-        } else {
-            None
+        };
+        if let Some((current, next)) = switch_params {
+            switch_ctx(current.cast::<u64>(), next.cast::<u64>());
         }
-        // lsched and sched guards dropped here before switch_ctx
-    };
-    #[cfg(feature = "yield_trace")]
-    match trace {
-        YieldTrace::None => {}
-        YieldTrace::NoSwitch {
-            lp_id,
-        } => logln!(
-            "No thread switch needed during yield on LP {:?} because the next thread is the same \
-             as the current thread.",
-            lp_id
-        ),
-        YieldTrace::FromThread {
-            current,
-            next,
-            lp_id,
-        } => logln!("Yielding from thread {:?} to thread {:?} on LP {:?}", current, next, lp_id),
-        YieldTrace::FromNonThread {
-            next,
-            lp_id,
-        } => logln!("Yielding from non-thread context to thread {:?} on LP {:?}", next, lp_id),
-    }
-    if let Some((curr_rsp0_ptr, next_rsp0_ptr)) = switch_params {
-        switch_ctx(curr_rsp0_ptr as *mut u64, next_rsp0_ptr as *const u64);
+        if !idle {
+            break;
+        }
+        // STI's interrupt shadow closes the wakeup-before-HLT race. The blocked
+        // thread's current handle remains available until its stack is saved.
+        unsafe {
+            asm!("sti", "hlt", "cli", options(nomem, nostack));
+        }
     }
     if interrupts_were_enabled {
         unmask_interrupts!();
@@ -374,10 +303,17 @@ pub unsafe extern "C" fn kernel_thread_trampoline() -> ! {
         "sti",
         "sub rsp, 8",
         "call r12",
-        "add rsp, 8",
-        "cli",
-        "2:",
-        "hlt",
-        "jmp 2b",
+        "call finish_kernel_thread",
+        "ud2",
     );
+}
+
+/// A completed kernel thread parks permanently. Its stack is retained because
+/// reclaiming the stack currently executing this function would be unsafe.
+#[unsafe(no_mangle)]
+pub extern "C" fn finish_kernel_thread() -> ! {
+    let tid = crate::cpu::scheduler::system_scheduler::get_thread_id().unwrap();
+    let _registration = SYSTEM_SCHEDULER.write().prepare_to_block(tid).unwrap();
+    crate::cpu::scheduler::yield_lp();
+    unreachable!("A completed kernel thread was resumed")
 }

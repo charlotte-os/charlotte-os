@@ -70,6 +70,7 @@ pub static AP_IDTS: LazyLock<Vec<crate::cpu::isa::interrupts::idt::Idt>> = LazyL
         let mut idt = crate::cpu::isa::interrupts::idt::Idt::new();
         logln!("LP {}: Registering fixed interrupt gates.", (get_lp_id()));
         crate::cpu::isa::interrupts::fixed::register_fixed_isr_gates(&mut idt);
+        crate::cpu::isa::interrupts::dynamic::register_dynamic_isr_gates(&mut idt);
         logln!("LP {}: Pushing the initialized IDT to the vector.", (get_lp_id()));
         idts.push(idt);
     }

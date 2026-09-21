@@ -7,4 +7,5 @@ cfg_select! {
         mod aarch64;
         pub use aarch64::*;
     }
+    target_arch = "riscv64" => {}
 }

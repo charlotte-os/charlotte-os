@@ -17,6 +17,12 @@ pub static TIMER_QUEUES: LazyLock<PerLp<TimerQueue>> =
 
 pub type Timestamp = <LpTimer as LpTimerIfce>::Timestamp;
 
+/// Round upwards so a timer never expires before the requested duration.
+pub fn deadline_after(duration: ExtDuration) -> Timestamp {
+    let ticks = duration.as_picos().div_ceil(LpTimer::get_ts_cycle_period().as_picos());
+    LpTimer::now().saturating_add(ticks.min(u64::MAX as u128) as u64)
+}
+
 /// A timer event that should notify observers when a specified deadline is reached. The deadline
 /// can be set using either a duration or an absolute timestamp.
 #[derive(Debug)]
@@ -51,8 +57,7 @@ impl From<Timestamp> for TimerEvent {
 
 impl From<ExtDuration> for TimerEvent {
     fn from(duration: ExtDuration) -> Self {
-        let deadline = LpTimer::now()
-            + (duration.as_picos() / LpTimer::get_ts_cycle_period().as_picos()) as Timestamp;
+        let deadline = deadline_after(duration);
         Self {
             deadline,
             observers: ConcurrentQueue::unbounded(),
@@ -74,54 +79,51 @@ pub struct TimerQueue {
 
 impl TimerQueue {
     pub fn add_event(&mut self, event: TimerEvent) {
-        let mut insertion_idx: Option<usize> = None;
-        for (i, event_node) in self.events.iter().enumerate() {
-            if event.deadline < event_node.get_deadline() {
-                insertion_idx = Some(i);
-                break;
+        let index = self
+            .events
+            .iter()
+            .position(|queued| event.deadline < queued.deadline)
+            .unwrap_or(self.events.len());
+        self.events.insert(index, event);
+        if index == 0 {
+            // Registration can occur while scheduler or condition locks are held.
+            // Never invoke observers synchronously here: an expired event must be
+            // delivered by an interrupt after the caller releases those locks.
+            let timer = LpTimer::get();
+            let mut timer = timer.lock();
+            match timer.set_deadline(self.events.front().unwrap().deadline) {
+                Ok(()) => {}
+                Err(LpTimerError::DeadlinePassed) => {
+                    timer
+                        .set_duration(ExtDuration::from_micros(1))
+                        .expect("Cannot arm expired timer event");
+                }
+                Err(error) => panic!("Cannot arm timer: {:?}", error),
             }
-        }
-        if insertion_idx.is_none() {
-            // If we get here then the event we are adding has a deadline that is after all of the
-            // other events in the queue so we can just add it to the back of the queue.
-            insertion_idx = Some(self.events.len());
-        }
-        let i = insertion_idx.unwrap();
-        self.events.insert(i, event);
-        if i == 0 {
-            // If the event we added is at the front of the queue then we need to prime the
-            // timer with its deadline so that it will fire at the
-            // correct time. If there are other events then the timer is
-            // already primed with the correct deadline and will be
-            // updated when the current event expires.
-            if let Some(next_event) = self.events.front() {
-                let timer = LpTimer::get();
-                let mut timerlk = timer.lock();
-                let _ = timerlk.stop();
-                timerlk
-                    .set_deadline(next_event.deadline)
-                    .expect("Failed to set timer deadline for new event");
-                timerlk.start().expect("Failed to start timer for new event");
-            }
+            timer.start().expect("Failed to start timer");
         }
     }
 
     pub fn process_events(&mut self) {
-        while let Some(event) = self.events.front() {
-            if event.get_deadline() <= LpTimer::now() {
-                event.signal();
-                self.events.pop_front();
-            } else if let Some(deadline) = self.get_next_deadline() {
-                let timer = LpTimer::get();
-                let mut timerlk = timer.lock();
-                if timerlk.set_deadline(deadline) == Err(LpTimerError::DeadlinePassed) {
-                    continue;
-                }
-                timerlk.start().expect("Failed to start timer for next event");
-                return;
-            } else {
+        loop {
+            let Some(event) = self.events.front() else {
                 let _ = LpTimer::get().lock().stop();
                 return;
+            };
+            if event.deadline <= LpTimer::now() {
+                let event = self.events.pop_front().unwrap();
+                event.signal();
+                continue;
+            }
+            let timer = LpTimer::get();
+            let mut timer = timer.lock();
+            match timer.set_deadline(event.deadline) {
+                Err(LpTimerError::DeadlinePassed) => continue,
+                Ok(()) => {
+                    timer.start().expect("Failed to start timer");
+                    return;
+                }
+                Err(error) => panic!("Cannot arm timer: {:?}", error),
             }
         }
     }

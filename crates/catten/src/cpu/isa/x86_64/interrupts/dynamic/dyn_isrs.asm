@@ -1,6 +1,8 @@
 .code64
 
-.extern get_dyn_ih
+.extern dispatch_dynamic_interrupt
+.extern increment_interrupt_depth
+.extern decrement_interrupt_depth
 .extern cond_yield_lp
 .extern signal_eoi
 .extern DYN_VECS_PER_LP
@@ -24,18 +26,13 @@ dyn_isr_\vector:
     push rbp
     mov rbp, rsp
     and rsp, ~0xf
-//; Call the function to get the current function pointer value for this vector
-    lea rdi, [DYN_IH_MAP]
-    mov rsi, \vector
-    call get_local_dyn_ih
-//; if the function pointer returned by get_dyn_ih is null (actually Option::None as seen by Rust), skip the call
-    test rax, rax
-    jz skip_ih_call_\vector
-//; make the call to the interrupt handler if the function pointer is non-null
-    call rax
-skip_ih_call_\vector:
+    cld
+    call increment_interrupt_depth
+    mov rdi, \vector
+    call dispatch_dynamic_interrupt
 //; Signal EOI since these interrupts all come through the LAPIC
     call signal_eoi
+    call decrement_interrupt_depth
 //; Execute context switch if pending
     call cond_yield_lp
 //; Restore the stack pointer to the value before alignment correction

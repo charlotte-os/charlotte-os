@@ -43,22 +43,61 @@ pub fn create_irq_gsi_mapping_table() -> [IrqGsiMapping; LEGACY_IRQ_COUNT] {
     let irq_override_entries =
         (*MADT_INDEX).get_entries_with_type(MadtEntryType::InterruptSourceOverride);
     for entry in irq_override_entries.iter() {
-        let override_entry =
-            unsafe { core::mem::transmute::<_, *const InterruptSourceOverrideEntry>(entry) };
+        let override_entry = *entry as *const InterruptSourceOverrideEntry;
+        if (unsafe { (*entry).read_unaligned() }.entry_length as usize)
+            < core::mem::size_of::<InterruptSourceOverrideEntry>()
+        {
+            continue;
+        }
         let irq = unsafe { override_entry.read_unaligned() }.irq_source as usize;
         if irq < LEGACY_IRQ_COUNT {
             irq_override_table[irq].gsi =
                 unsafe { override_entry.read_unaligned() }.global_system_interrupt;
+            let flags = unsafe { override_entry.read_unaligned() }.flags;
             irq_override_table[irq].polarity =
-                unsafe { override_entry.read_unaligned() }.flags.polarity()
-                    != interrupt_flags::InterruptPolarity::ActiveLow;
+                flags.polarity() != interrupt_flags::InterruptPolarity::ActiveLow;
             irq_override_table[irq].latched =
-                unsafe { override_entry.read_unaligned() }.flags.trigger_mode()
-                    == interrupt_flags::InterruptTriggerMode::Level;
+                flags.trigger_mode() == interrupt_flags::InterruptTriggerMode::Level;
         }
     }
     // Return the final IRQ to GSI mapping table
     irq_override_table
+}
+
+/// Resolve an ACPI event interrupt. SCI/GPE lines default to active-low, level-triggered;
+/// only explicit MADT flags replace those defaults. Legacy ISA defaults are inappropriate here.
+pub fn resolve_acpi_interrupt(irq: u32) -> Option<(u32, bool, bool)> {
+    let mut route = (irq, true, true);
+    if irq >= LEGACY_IRQ_COUNT as u32 {
+        return Some(route);
+    }
+    for entry in MADT_INDEX.get_entries_with_type(MadtEntryType::InterruptSourceOverride) {
+        if (unsafe { (*entry).read_unaligned() }.entry_length as usize)
+            < core::mem::size_of::<InterruptSourceOverrideEntry>()
+        {
+            return None;
+        }
+        let entry = unsafe { (*entry as *const InterruptSourceOverrideEntry).read_unaligned() };
+        if entry.bus != 0 || entry.irq_source as u32 != irq {
+            continue;
+        }
+        let flags = entry.flags;
+        route.0 = entry.global_system_interrupt;
+        route.1 = match flags.polarity() {
+            interrupt_flags::InterruptPolarity::BusSpec => true,
+            interrupt_flags::InterruptPolarity::ActiveHigh => false,
+            interrupt_flags::InterruptPolarity::ActiveLow => true,
+            interrupt_flags::InterruptPolarity::Reserved => return None,
+        };
+        route.2 = match flags.trigger_mode() {
+            interrupt_flags::InterruptTriggerMode::BusSpec => true,
+            interrupt_flags::InterruptTriggerMode::Edge => false,
+            interrupt_flags::InterruptTriggerMode::Level => true,
+            interrupt_flags::InterruptTriggerMode::Reserved => return None,
+        };
+        break;
+    }
+    Some(route)
 }
 
 pub unsafe fn enumerate_ioapics() -> HashMap<IoapicId, Mutex<IoapicDescriptor>> {

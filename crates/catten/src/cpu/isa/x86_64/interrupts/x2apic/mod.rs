@@ -67,6 +67,10 @@ impl X2Apic {
         id::X2APIC_ID_TABLE.lock().get(&lp_id).cloned()
     }
 
+    pub fn physical_id(lp_id: LpId) -> Option<u32> {
+        Self::translate_lp_id(lp_id).map(|id| id.physical)
+    }
+
     fn make_icr_low(
         vector: u8,
         delivery_mode: IcrDeliveryMode,

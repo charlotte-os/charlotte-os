@@ -233,7 +233,7 @@ unsafe extern "custom" {
 #[inline(always)]
 fn register_dyn_isr(idt: &mut Idt, offset: u8, isr: unsafe extern "custom" fn()) {
     let vector = DYN_VEC_START_OFFSET + offset;
-    idt.set_gate(vector, isr, gdt::KERNEL_CODE_SELECTOR, None, false, false);
+    idt.set_gate(vector, isr, gdt::KERNEL_CODE_SELECTOR, None, false, true);
 }
 
 pub fn register_dynamic_isr_gates(idt: &mut Idt) {

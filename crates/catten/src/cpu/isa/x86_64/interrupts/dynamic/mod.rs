@@ -1,9 +1,9 @@
 mod stubs;
-
 use alloc::boxed::Box;
 use core::ops::{Index, IndexMut};
 
 use spin::LazyLock;
+pub use stubs::register_dynamic_isr_gates;
 
 use crate::cpu::isa::constants::interrupt_vectors::{DYN_VEC_START_OFFSET, DYN_VECS_PER_LP};
 use crate::cpu::isa::interface::interrupts::DynIhMapIfce;
@@ -31,15 +31,15 @@ impl LpDynIhTable {
     }
 
     fn get(&self, index: IntSrcDscr) -> &Option<InterruptHandler> {
-        &self.table[index as usize]
+        &self.table[(index - DYN_VEC_START_OFFSET) as usize]
     }
 
     fn get_copied(&self, index: IntSrcDscr) -> Option<InterruptHandler> {
-        self.table[index as usize].clone()
+        *self.get(index)
     }
 
     fn get_mut(&mut self, index: IntSrcDscr) -> &mut Option<InterruptHandler> {
-        &mut self.table[index as usize]
+        &mut self.table[(index - DYN_VEC_START_OFFSET) as usize]
     }
 }
 
@@ -85,7 +85,11 @@ impl DynIhMap {
     /// that purpose.
     pub fn get_handler(&self, lp: LpId, vector: IntSrcDscr) -> Result<InterruptHandler, Error> {
         if core::hint::likely(Self::in_dyn_vec_range(vector)) {
-            self.map_table[lp as usize].get_copied(vector).ok_or(Error::IntVecUnassigned(vector))
+            self.map_table
+                .get(lp as usize)
+                .ok_or(Error::InvalidLpId)?
+                .get_copied(vector)
+                .ok_or(Error::IntVecUnassigned(vector))
         } else {
             Err(Error::ArgIsFixedIntVec(vector))
         }
@@ -99,6 +103,17 @@ impl DynIhMap {
             .min_by_key(|&(_, lp_table)| lp_table.vectors_used)
             .map(|(i, _)| i)
             .unwrap()
+    }
+
+    /// Allocate on a specific processor, for interrupts with firmware CPU affinity.
+    pub fn find_available_target_on_lp(&self, lp: LpId) -> Option<InterruptTarget> {
+        let table = self.map_table.get(lp as usize)?;
+        (DYN_VEC_START_OFFSET..DYN_VEC_START_OFFSET + DYN_VECS_PER_LP)
+            .find(|&vector| table.get(vector).is_none())
+            .map(|discriminator| InterruptTarget::Processor {
+                lp_id: lp,
+                discriminator,
+            })
     }
 }
 
@@ -114,16 +129,17 @@ impl DynIhMapIfce for DynIhMap {
         }
 
         let lp_index = lp as usize;
-        let lp_table = &mut self.map_table[lp_index];
+        let lp_table = self.map_table.get_mut(lp_index).ok_or(Error::InvalidLpId)?;
 
         if lp_table.get_mut(vector).is_none() {
             *lp_table.get_mut(vector) = Some(handler);
             lp_table.vectors_used += 1;
+        } else {
+            return Err(Error::IntVecAlreadyAssigned(vector));
         }
         Ok(())
     }
 
-    #[unsafe(no_mangle)]
     extern "C" fn get_local_dyn_ih(&self, vector: IntSrcDscr) -> Option<InterruptHandler> {
         match self.get_handler(get_lp_id(), vector) {
             Ok(handler) => Some(handler),
@@ -137,7 +153,7 @@ impl DynIhMapIfce for DynIhMap {
         }
 
         let lp_index = lp as usize;
-        let lp_table = &mut self.map_table[lp_index];
+        let lp_table = self.map_table.get_mut(lp_index).ok_or(Error::InvalidLpId)?;
 
         if lp_table.get_mut(vector).is_some() {
             *lp_table.get_mut(vector) = None;
@@ -158,5 +174,15 @@ impl DynIhMapIfce for DynIhMap {
             }
         }
         None
+    }
+}
+
+/// Assembly enters through this wrapper, never by treating a LazyLock/RwLock as its payload.
+#[unsafe(no_mangle)]
+extern "C" fn dispatch_dynamic_interrupt(offset: u8) {
+    let vector = offset + DYN_VEC_START_OFFSET;
+    let handler = DYN_IH_MAP.read().get_local_dyn_ih(vector);
+    if let Some(handler) = handler {
+        handler(vector);
     }
 }

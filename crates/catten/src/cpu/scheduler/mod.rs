@@ -26,6 +26,19 @@ pub fn spawn_thread(asid: AddressSpaceId, entry_point: extern "C" fn()) -> Threa
     tid
 }
 
+/// Spawn a thread that always runs on the specified logical processor.
+pub fn spawn_thread_on_lp(
+    asid: AddressSpaceId,
+    entry_point: extern "C" fn(),
+    lp_id: crate::cpu::isa::lp::LpId,
+) -> ThreadId {
+    let mut thread = Thread::new(asid, entry_point);
+    thread.affinity = Some(lp_id);
+    let tid = MASTER_THREAD_TABLE.write().add_element(thread);
+    SYSTEM_SCHEDULER.read().submit_ready_thread(tid).expect("Error submitting pinned thread");
+    tid
+}
+
 /// Unconditionally yields the current logical processor to the scheduler for a context switch.
 ///
 /// This can safely be called from anywhere including outside of thread context. However if it is
@@ -59,14 +72,11 @@ pub fn abort() -> ! {
 
 /// Blocks the current thread for at least the specified duration.
 pub fn sleep(duration: ExtDuration) {
-    let mut timer_event = TimerEvent::from(duration);
-    if let Some(tid) = SYSTEM_SCHEDULER.read().get_lp_scheduler().lock().get_tid() {
-        SYSTEM_SCHEDULER
-            .write()
-            .block_thread(tid, &mut timer_event)
-            .expect("Error putting thread to sleep");
-        TIMER_QUEUES.try_get_mut().unwrap().add_event(timer_event);
+    if duration.as_picos() == 0 {
+        return;
     }
+    // A zero-count semaphore can only be woken by its deadline.
+    sync::semaphore::Semaphore::new(0).wait(Some(crate::timers::deadline_after(duration)));
 }
 
 /// Registers an observer to be notified when the specified thread exits.

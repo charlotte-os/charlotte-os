@@ -5,7 +5,10 @@ use core::ptr::NonNull;
 use hashbrown::HashMap;
 use spin::LazyLock;
 
+use crate::cpu::isa::interface::interrupts::ExternalInterruptControllerIfce;
 use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
+use crate::cpu::isa::interrupts::LocalIntCtlr;
+use crate::cpu::isa::lp::{IntSrcDscr, LpId};
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
 use crate::cpu::multiprocessor::spin::rwlock::RwLock;
 use crate::environment::acpi::sdt::madt::interface::enumerate_ioapics;
@@ -22,7 +25,7 @@ pub struct IoapicDescriptor {
     base: VirtualAddress,
     version: u8,
     acpi_gsi_base: u32,
-    num_redirection_entries: u8,
+    num_redirection_entries: u16,
 }
 
 impl IoapicDescriptor {
@@ -48,7 +51,7 @@ impl IoapicDescriptor {
         const IOAPIC_VERSION_MASK: u32 = 0xff;
         const IOAPIC_REDIRECTION_ENTRY_MAX_MASK: u32 = 0xff;
         const IOAPIC_REDIRECTION_ENTRY_MAX_SHIFT: u8 = 16;
-        Self {
+        let mut descriptor = Self {
             base,
             acpi_gsi_base,
             version: (version_reg & IOAPIC_VERSION_MASK) as u8,
@@ -56,8 +59,10 @@ impl IoapicDescriptor {
                 version_reg,
                 IOAPIC_REDIRECTION_ENTRY_MAX_SHIFT,
                 IOAPIC_REDIRECTION_ENTRY_MAX_MASK,
-            ) + 1) as u8,
-        }
+            ) + 1) as u16,
+        };
+        descriptor.init();
+        descriptor
     }
 
     /// Get the MMIO addresses for the IOAPIC registers.
@@ -105,8 +110,11 @@ impl IoapicDescriptor {
         let low_offset = Self::IRT_BASE_OFFSET + (index as u32) * 2;
         let high_offset = low_offset + 1;
         let (reg_low, reg_high) = irte.get_reg_vals();
-        self.write_reg32(low_offset, reg_low);
+        // Disable delivery before changing the destination, then publish the final low word.
+        let previous_low = self.read_reg32(low_offset);
+        self.write_reg32(low_offset, previous_low | (1 << 16));
         self.write_reg32(high_offset, reg_high);
+        self.write_reg32(low_offset, reg_low);
     }
 
     pub fn get_irte(&mut self, index: u8) -> irte::Irte {
@@ -115,5 +123,52 @@ impl IoapicDescriptor {
         let reg_low = self.read_reg32(low_offset);
         let reg_high = self.read_reg32(high_offset);
         irte::Irte::from_reg_vals(reg_low, reg_high)
+    }
+
+    pub fn pin_for_gsi(&self, gsi: u32) -> Option<u8> {
+        let pin = gsi.checked_sub(self.acpi_gsi_base)?;
+        (pin < self.num_redirection_entries as u32).then_some(pin as u8)
+    }
+}
+
+impl ExternalInterruptControllerIfce for IoapicDescriptor {
+    type EicPinNum = u8;
+    type Error = super::Error;
+
+    fn init(&mut self) {
+        for pin in 0..self.num_redirection_entries {
+            self.set_ext_int_mask_state(pin as u8, true).unwrap_or_else(|_| unreachable!());
+        }
+    }
+
+    fn setup_ext_int(
+        &mut self,
+        lp: LpId,
+        vector: IntSrcDscr,
+        pin: u8,
+        active_low: bool,
+        level: bool,
+        masked: bool,
+    ) -> Result<(), Self::Error> {
+        if pin as u16 >= self.num_redirection_entries {
+            return Err(super::Error::InvalidSource);
+        }
+        let destination = LocalIntCtlr::physical_id(lp).ok_or(super::Error::InvalidTarget)?;
+        // Without interrupt remapping an IOAPIC has an eight-bit physical destination field.
+        if destination >= 255 {
+            return Err(super::Error::IdOutOfRange);
+        }
+        self.set_irte(pin, irte::Irte::new(vector, destination as u8, active_low, level, masked));
+        Ok(())
+    }
+
+    fn set_ext_int_mask_state(&mut self, pin: u8, masked: bool) -> Result<(), Self::Error> {
+        if pin as u16 >= self.num_redirection_entries {
+            return Err(super::Error::InvalidSource);
+        }
+        let mut entry = self.get_irte(pin);
+        entry.set_mask_bit(masked);
+        self.set_irte(pin, entry);
+        Ok(())
     }
 }

@@ -94,27 +94,30 @@ impl LpScheduler for RoundRobin {
     }
 
     fn next(&mut self) -> Result<ThreadId, Error> {
-        if !self.run_queue.is_empty() {
-            let previous_handle = self.current_handle;
-            if let Some(handle) = self.current_handle {
-                self.run_queue.push_back(handle);
-            }
-            self.current_handle = Some(unsafe { self.run_queue.pop_front().unwrap_unchecked() });
-            let next_tid = unsafe { self.current_handle.unwrap_unchecked() }.0;
-            let mut tt_guard = MASTER_THREAD_TABLE.write();
-            if let Some(previous_handle) = previous_handle {
-                tt_guard.get_mut(previous_handle.0).as_mut().unwrap().state =
-                    ThreadState::Ready(self.lp_id);
-            }
-            tt_guard.get_mut(next_tid).as_mut().unwrap().state = ThreadState::Running(self.lp_id);
-            Ok(next_tid)
-        } else {
-            if self.current_handle.is_some() {
-                Ok(unsafe { self.current_handle.unwrap_unchecked() }.0)
+        let mut threads = MASTER_THREAD_TABLE.write();
+        let previous = self.current_handle;
+        let previous_is_runnable = previous.is_some_and(|handle| {
+            threads
+                .get(handle.0)
+                .is_ok_and(|thread| matches!(thread.state, ThreadState::Running(_)))
+        });
+        if self.run_queue.is_empty() {
+            return if previous_is_runnable {
+                Ok(previous.unwrap().0)
             } else {
                 Err(Error::NoRunnableThreads)
-            }
+            };
         }
+        if previous_is_runnable {
+            let previous = previous.unwrap();
+            threads.get_mut(previous.0).unwrap().state = ThreadState::Ready(self.lp_id);
+            self.run_queue.push_back(previous);
+        }
+        let next = self.run_queue.pop_front().unwrap();
+        self.current_handle = Some(next);
+        threads.get_mut(next.0).unwrap().state = ThreadState::Running(self.lp_id);
+        self.is_idle = false;
+        Ok(next.0)
     }
 
     fn add_thread(&mut self, tid: ThreadId) -> Result<(), Error> {

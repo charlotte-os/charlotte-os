@@ -98,9 +98,11 @@ impl<'vas> PthWalker<'vas> {
         writable: bool,
         user_accessible: bool,
         no_execute: bool,
-    ) -> *mut super::PageTable {
-        let new_table = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame().unwrap();
+    ) -> WalkerResult<*mut super::PageTable> {
+        let new_table = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame()?;
         unsafe {
+            let new_table_ptr: *mut super::PageTable = new_table.into();
+            core::ptr::write_bytes(new_table_ptr.cast::<u8>(), 0, PAGE_SIZE);
             Self::set_table_entry(
                 &mut (*parent_table_ptr)[parent_index],
                 new_table,
@@ -109,19 +111,17 @@ impl<'vas> PthWalker<'vas> {
                 no_execute,
                 false,
             );
-            let new_table_ptr: *mut super::PageTable = new_table.into();
-            core::ptr::write_bytes(new_table_ptr.cast::<u8>(), 0, PAGE_SIZE);
-            new_table_ptr
+            Ok(new_table_ptr)
         }
     }
 
-    fn ensure_pml4(&mut self) -> *mut super::PageTable {
+    fn ensure_pml4(&mut self) -> WalkerResult<*mut super::PageTable> {
         if self.pml4_ptr.is_null() {
             // Obtain the PML4 table pointer; all address spaces must have a top level page
             // table as they are all required to map the kernel and
             // higher half memory.
             if self.address_space.cr3 & CR3_ADDRESS_MASK == 0 {
-                let new_pml4 = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame().unwrap();
+                let new_pml4 = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame()?;
                 self.address_space.cr3 =
                     <PhysicalAddress as Into<u64>>::into(new_pml4) & CR3_ADDRESS_MASK;
                 self.address_space.load().expect("Error reloading the CR3 register");
@@ -131,7 +131,7 @@ impl<'vas> PthWalker<'vas> {
                 core::ptr::write_bytes(self.pml4_ptr.cast::<u8>(), 0, PAGE_SIZE);
             }
         }
-        self.pml4_ptr
+        Ok(self.pml4_ptr)
     }
 
     fn prepare_map_walk_result(walk_result: WalkerResult<()>) -> WalkerResult<()> {
@@ -187,9 +187,10 @@ impl<'vas> PthWalker<'vas> {
         writable: bool,
         user_accessible: bool,
         no_execute: bool,
+        pat_index: u8,
     ) -> WalkerResult<()> {
         Self::prepare_map_walk_result(self.walk())?;
-        self.ensure_pml4();
+        self.ensure_pml4()?;
         if self.pdpt_ptr.is_null() {
             // Allocate a new page table for the PDPT
             self.pdpt_ptr = self.allocate_and_link_table(
@@ -198,12 +199,14 @@ impl<'vas> PthWalker<'vas> {
                 writable,
                 user_accessible,
                 no_execute,
-            );
+            )?;
         }
         if self.pd_ptr.is_null() {
             // Allocate a new page table for the PD
-            let new_pd = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame().unwrap();
+            let new_pd = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame()?;
+            self.pd_ptr = new_pd.into();
             unsafe {
+                core::ptr::write_bytes(self.pd_ptr.cast::<u8>(), 0, PAGE_SIZE);
                 Self::set_table_entry(
                     &mut (*self.pdpt_ptr)[self.vaddr.pdpt_index()],
                     new_pd,
@@ -212,10 +215,6 @@ impl<'vas> PthWalker<'vas> {
                     no_execute,
                     false,
                 );
-            }
-            self.pd_ptr = new_pd.into();
-            unsafe {
-                core::ptr::write_bytes(self.pd_ptr.cast::<u8>(), 0, PAGE_SIZE);
             }
         }
         if self.pt_ptr.is_null() {
@@ -230,7 +229,7 @@ impl<'vas> PthWalker<'vas> {
                 writable,
                 user_accessible,
                 no_execute,
-            );
+            )?;
         }
         // Map the page frame
         unsafe {
@@ -242,6 +241,7 @@ impl<'vas> PthWalker<'vas> {
                 no_execute,
                 false,
             );
+            (*self.pt_ptr)[self.vaddr.pt_index()].set_pat_index_bits(pat_index);
         }
         self.address_space.load().expect("Failed to reload the address space");
         unsafe {
@@ -310,9 +310,10 @@ impl<'vas> PthWalker<'vas> {
         writable: bool,
         user_accessible: bool,
         no_execute: bool,
+        pat_index: u8,
     ) -> WalkerResult<()> {
         Self::prepare_map_walk_result(self.walk_large_page())?;
-        self.ensure_pml4();
+        self.ensure_pml4()?;
         if self.pdpt_ptr.is_null() {
             // Allocate a new page table for the PDPT
             self.pdpt_ptr = self.allocate_and_link_table(
@@ -321,7 +322,7 @@ impl<'vas> PthWalker<'vas> {
                 writable,
                 user_accessible,
                 no_execute,
-            );
+            )?;
         }
         if self.pd_ptr.is_null() {
             // Allocate a new page table for the PD
@@ -331,7 +332,7 @@ impl<'vas> PthWalker<'vas> {
                 writable,
                 user_accessible,
                 no_execute,
-            );
+            )?;
         }
         unsafe {
             if (*self.pd_ptr)[self.vaddr.pd_index()].is_present() {
@@ -347,6 +348,7 @@ impl<'vas> PthWalker<'vas> {
                 no_execute,
                 true,
             );
+            (*self.pd_ptr)[self.vaddr.pd_index()].set_pat_index_bits_large_huge(pat_index);
         }
         Ok(())
     }
@@ -368,9 +370,10 @@ impl<'vas> PthWalker<'vas> {
         writable: bool,
         user_accessible: bool,
         no_execute: bool,
+        pat_index: u8,
     ) -> WalkerResult<()> {
         Self::prepare_map_walk_result(self.walk_huge_page())?;
-        self.ensure_pml4();
+        self.ensure_pml4()?;
         if self.pdpt_ptr.is_null() {
             // Allocate a new page table for the PDPT
             self.pdpt_ptr = self.allocate_and_link_table(
@@ -379,7 +382,7 @@ impl<'vas> PthWalker<'vas> {
                 writable,
                 user_accessible,
                 no_execute,
-            );
+            )?;
         }
         unsafe {
             if (*self.pdpt_ptr)[self.vaddr.pdpt_index()].is_present() {
@@ -395,6 +398,7 @@ impl<'vas> PthWalker<'vas> {
                 no_execute,
                 true,
             );
+            (*self.pdpt_ptr)[self.vaddr.pdpt_index()].set_pat_index_bits_large_huge(pat_index);
         }
         Ok(())
     }

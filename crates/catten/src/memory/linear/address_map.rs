@@ -33,7 +33,11 @@ static LA_MAP_39BIT: LazyLock<LinearAddressMap> = LazyLock::new(|| LinearAddress
     },
     kernel_mmio: LinearMemoryRegion {
         base: VirtualAddress::from(0xffffff0800000000usize),
-        length: gibibytes(4),
+        length: gibibytes(2),
+    },
+    acpi_mappings: LinearMemoryRegion {
+        base: VirtualAddress::from(0xffffff0880000000usize),
+        length: gibibytes(2),
     },
     kernel_allocator_arena: LinearMemoryRegion {
         base: VirtualAddress::from(0xffffff1000000000usize),
@@ -64,7 +68,11 @@ static LA_MAP_48BIT: LazyLock<LinearAddressMap> = LazyLock::new(|| LinearAddress
     },
     kernel_mmio: LinearMemoryRegion {
         base: VirtualAddress::from(0xffff820000000000usize),
-        length: tebibytes(2),
+        length: tebibytes(1),
+    },
+    acpi_mappings: LinearMemoryRegion {
+        base: VirtualAddress::from(0xffff830000000000usize),
+        length: tebibytes(1),
     },
     kernel_allocator_arena: LinearMemoryRegion {
         base: VirtualAddress::from(0xffff840000000000usize),
@@ -95,7 +103,11 @@ static LA_MAP_57BIT: LazyLock<LinearAddressMap> = LazyLock::new(|| LinearAddress
     },
     kernel_mmio: LinearMemoryRegion {
         base: VirtualAddress::from(0xff88000000000000usize),
-        length: pebibytes(1),
+        length: tebibytes(512),
+    },
+    acpi_mappings: LinearMemoryRegion {
+        base: VirtualAddress::from(0xff8a000000000000usize),
+        length: tebibytes(512),
     },
     kernel_allocator_arena: LinearMemoryRegion {
         base: VirtualAddress::from(0xff90000000000000usize),
@@ -114,6 +126,7 @@ pub enum RegionType {
     DirectMapping,
     KernelStackArena,
     KernelMmio,
+    AcpiMappings,
     KernelAllocatorArena,
     KernelImage,
 }
@@ -124,6 +137,7 @@ pub struct LinearAddressMap {
     direct_mapping: LinearMemoryRegion,
     kernel_stack_arena: LinearMemoryRegion,
     kernel_mmio: LinearMemoryRegion,
+    acpi_mappings: LinearMemoryRegion,
     kernel_allocator_arena: LinearMemoryRegion,
     kernel_image: LinearMemoryRegion,
 }
@@ -140,6 +154,8 @@ impl LinearAddressMap {
             RegionType::KernelStackArena
         } else if self.kernel_mmio.contains(addr) {
             RegionType::KernelMmio
+        } else if self.acpi_mappings.contains(addr) {
+            RegionType::AcpiMappings
         } else if self.kernel_allocator_arena.contains(addr) {
             RegionType::KernelAllocatorArena
         } else if self.kernel_image.contains(addr) {
@@ -159,6 +175,7 @@ impl LinearAddressMap {
             RegionType::DirectMapping => &self.direct_mapping,
             RegionType::KernelStackArena => &self.kernel_stack_arena,
             RegionType::KernelMmio => &self.kernel_mmio,
+            RegionType::AcpiMappings => &self.acpi_mappings,
             RegionType::KernelAllocatorArena => &self.kernel_allocator_arena,
             RegionType::KernelImage => &self.kernel_image,
         }

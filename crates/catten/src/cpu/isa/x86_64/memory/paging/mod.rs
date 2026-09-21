@@ -6,11 +6,41 @@ use core::ptr::NonNull;
 
 use super::MemoryInterfaceImpl;
 use super::address::vaddr::VirtualAddress;
-use crate::cpu::isa::interface::memory::address::Address;
+use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
 use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface, MemoryMapping};
 use crate::klib::size::{gibibytes, kibibytes, mebibytes};
 use crate::logln;
 use crate::memory::PhysicalAddress;
+use crate::memory::linear::PageType;
+
+/// Use the bootloader's PAT layout instead of assuming a particular WC/UC index.
+/// Leaf entries select device memory as UC; ordinary RAM stays write-back.
+fn pat_index(page_type: PageType) -> u8 {
+    let low: u32;
+    let high: u32;
+    unsafe {
+        asm!("rdmsr", in("ecx") 0x277u32, out("eax") low, out("edx") high, options(nomem, nostack));
+    }
+    let pat = (u64::from(high) << 32) | u64::from(low);
+    let desired = if page_type.should_combine_writes() {
+        1
+    } else if page_type.is_uncacheable() {
+        0
+    } else {
+        6
+    };
+    let find = |kind| (0..8).find(|index| (pat >> (index * 8)) & 0xff == kind);
+    // WC is optional: a framebuffer may safely fall back to UC.
+    find(desired)
+        .or_else(|| {
+            if desired == 1 {
+                find(0)
+            } else {
+                None
+            }
+        })
+        .expect("The CPU PAT lacks the required memory type") as u8
+}
 
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
@@ -60,6 +90,23 @@ pub struct AddressSpace {
 }
 
 impl AddressSpace {
+    /// Retire an ACPI leaf without recycling paging structures still cached on
+    /// other processors. The caller must never reuse this virtual address.
+    pub fn unmap_page_retaining_tables(
+        &mut self,
+        vaddr: VirtualAddress,
+    ) -> Result<PhysicalAddress, super::Error> {
+        let mut walker = pth_walker::PthWalker::new(self, vaddr);
+        walker.walk()?;
+        unsafe {
+            let entry = &mut (*walker.pt_ptr)[vaddr.pt_index()];
+            let frame = entry.try_get_frame()?;
+            entry.set_present(false);
+            asm!("invlpg [{}]", in(reg) vaddr.into_ptr::<u8>(), options(nostack, preserves_flags));
+            Ok(frame)
+        }
+    }
+
     pub fn get_cr3(&self) -> u64 {
         self.cr3
     }
@@ -210,6 +257,7 @@ impl AddressSpaceInterface for AddressSpace {
             mapping.page_type.is_writable(),
             mapping.page_type.is_user_accessible(),
             mapping.page_type.is_no_execute(),
+            pat_index(mapping.page_type),
         )?;
         Ok(())
     }
@@ -238,6 +286,7 @@ impl AddressSpaceInterface for AddressSpace {
             mapping.page_type.is_writable(),
             mapping.page_type.is_user_accessible(),
             mapping.page_type.is_no_execute(),
+            pat_index(mapping.page_type),
         )?;
         Ok(())
     }
@@ -266,6 +315,7 @@ impl AddressSpaceInterface for AddressSpace {
             mapping.page_type.is_writable(),
             mapping.page_type.is_user_accessible(),
             mapping.page_type.is_no_execute(),
+            pat_index(mapping.page_type),
         )?;
         Ok(())
     }

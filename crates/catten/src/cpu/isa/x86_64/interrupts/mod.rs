@@ -20,4 +20,5 @@ pub enum Error {
     InvalidLpId,
     IntVecUnassigned(u8),
     ArgIsFixedIntVec(u8),
+    IntVecAlreadyAssigned(u8),
 }
