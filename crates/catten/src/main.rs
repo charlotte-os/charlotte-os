@@ -59,7 +59,7 @@ use crate::device_management::drivers::platform_devices::wired_interrupt_control
 use crate::device_management::topology::DEVICE_TOPOLOGY;
 use crate::memory::KERNEL_ASID;
 
-const KERNEL_VERSION: (u64, u64, u64) = (0, 9, 5);
+const KERNEL_VERSION: (u64, u64, u64) = (0, 10, 0);
 static INIT_BARRIER: LazyLock<Barrier> = LazyLock::new(|| Barrier::new(get_lp_count() as usize));
 static YIELD_BARRIER: LazyLock<Barrier> = LazyLock::new(|| Barrier::new(get_lp_count() as usize));
 /// This is the bootstrap processor's entry point into the kernel. The `bsp_main` function is
