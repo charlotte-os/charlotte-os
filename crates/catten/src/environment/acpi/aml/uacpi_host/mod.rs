@@ -33,11 +33,11 @@ mod c_alloc;
 mod io;
 
 use alloc::boxed::Box;
-use alloc::sync::Arc;
 use core::ffi::c_void;
 use core::ops::Add;
 
 use io::{ACPI_CLAIMED_IO_REGIONS, IoRegion, overlaps_acpi_claimed};
+use lock_api::{RawMutex, RawMutexTimed};
 use uacpi_wrapper::{
     uacpi_bool,
     uacpi_cpu_flags,
@@ -68,7 +68,6 @@ use crate::cpu::isa::timers::LpTimer;
 use crate::cpu::isa::timers::tsc::TSC_FREQUENCY_HZ;
 use crate::cpu::multiprocessor::interrupt_tracking::INT_STATE;
 use crate::cpu::scheduler::system_scheduler::{SYSTEM_SCHEDULER, get_thread_id};
-use crate::cpu::scheduler::threads::waker::Waker;
 use crate::device_management::drivers::busses::pci_express::topology::{
     PcieDeviceNum,
     PcieFunctionNum,
@@ -76,15 +75,14 @@ use crate::device_management::drivers::busses::pci_express::topology::{
 };
 use crate::device_management::topology::DEVICE_TOPOLOGY;
 use crate::klib::constants::NANOS_PER_SEC;
-use crate::klib::observer::Observable;
 use crate::klib::time::duration::ExtDuration;
-use crate::log;
 use crate::memory::allocators::memory::PageSize;
 use crate::memory::linear::PageType;
 use crate::memory::linear::address_map::LA_MAP;
-use crate::memory::linear::address_map::RegionType::{KernelAllocatorArena, KernelMmio};
+use crate::memory::linear::address_map::RegionType::KernelMmio;
 use crate::memory::{AddressSpaceInterface, KERNEL_AS, PhysicalAddress, VirtualAddress};
 use crate::timers::{TIMER_QUEUES, TimerEvent};
+use crate::{log, logln};
 
 /* ------------------------------------------------------------------------------------------- *
  * Table discovery                                                                              *
@@ -154,6 +152,16 @@ pub unsafe extern "C" fn uacpi_kernel_unmap(addr: *mut core::ffi::c_void, len: u
  * Logging                                                                                      *
  * ------------------------------------------------------------------------------------------- */
 
+fn uacpi_log_level_to_str(level: uacpi_log_level) -> &'static str {
+    match level {
+        uacpi_wrapper::UACPI_LOG_DEBUG => "DEBUG",
+        uacpi_wrapper::UACPI_LOG_INFO => "INFO",
+        uacpi_wrapper::UACPI_LOG_WARN => "WARN",
+        uacpi_wrapper::UACPI_LOG_ERROR => "ERROR",
+        _ => "UNKNOWN_LOG_LEVEL",
+    }
+}
+
 /// Emits one already-formatted, NUL-terminated uACPI log message.
 ///
 /// uACPI terminates each message with a bare `\n`, which is not what the kernel terminal wants; see
@@ -163,9 +171,9 @@ pub unsafe extern "C" fn uacpi_kernel_log(
     level: uacpi_log_level,
     message: *const core::ffi::c_char,
 ) {
-    log!(
+    logln!(
         "[ACPI][uACPI] {}: {}",
-        level,
+        (uacpi_log_level_to_str(level)),
         (unsafe { core::ffi::CStr::from_ptr(message) }.to_str().unwrap_or("<invalid UTF-8>"))
     );
 }
@@ -488,14 +496,14 @@ pub unsafe extern "C" fn uacpi_kernel_sleep(msec: uacpi_u64) {
 /// context.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_create_mutex() -> uacpi_handle {
-    todo!("Allocate a kernel mutex and return an opaque handle to it.")
+    Box::into_raw(Box::new(crate::cpu::scheduler::sync::mutex::MutexCore::default()))
+        as uacpi_handle
 }
 
 /// Destroys a mutex created by [`uacpi_kernel_create_mutex`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_free_mutex(handle: uacpi_handle) {
-    let _ = handle;
-    todo!("Destroy the mutex behind the handle.")
+    drop(unsafe { Box::from_raw(handle as *mut crate::cpu::scheduler::sync::mutex::MutexCore) })
 }
 
 /// Acquires a mutex, where `timeout` is `0` for a single non-blocking attempt, `0xffff` for an
@@ -505,15 +513,42 @@ pub unsafe extern "C" fn uacpi_kernel_acquire_mutex(
     handle: uacpi_handle,
     timeout: uacpi_u16,
 ) -> uacpi_status {
-    let _ = (handle, timeout);
-    todo!("Acquire the mutex, honouring the timeout encoding described above.")
+    match timeout {
+        0 => {
+            // Non-blocking attempt
+            if unsafe { &*(handle as *mut crate::cpu::scheduler::sync::mutex::MutexCore) }
+                .try_lock()
+            {
+                UACPI_STATUS_OK
+            } else {
+                UACPI_STATUS_TIMEOUT
+            }
+        }
+        0xffff => {
+            // Unbounded wait
+            unsafe { &*(handle as *mut crate::cpu::scheduler::sync::mutex::MutexCore) }.lock();
+            UACPI_STATUS_OK
+        }
+        ms => {
+            // Bounded wait
+            if unsafe { &*(handle as *mut crate::cpu::scheduler::sync::mutex::MutexCore) }
+                .try_lock_for(ExtDuration::from_millis(ms as u128))
+            {
+                UACPI_STATUS_OK
+            } else {
+                UACPI_STATUS_TIMEOUT
+            }
+        }
+    }
 }
 
 /// Releases a mutex acquired by [`uacpi_kernel_acquire_mutex`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_release_mutex(handle: uacpi_handle) {
-    let _ = handle;
-    todo!("Release the mutex.")
+    let mutex = unsafe { &*(handle as *mut crate::cpu::scheduler::sync::mutex::MutexCore) };
+    unsafe {
+        mutex.unlock();
+    }
 }
 
 /// Creates a counting event, the primitive uACPI waits on for firmware completions.
@@ -593,22 +628,25 @@ pub unsafe extern "C" fn uacpi_kernel_restore_interrupts(state: uacpi_interrupt_
 /// may not block.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_create_spinlock() -> uacpi_handle {
-    todo!("Allocate a spinlock and return an opaque handle to it.")
+    Box::into_raw(Box::new(crate::cpu::multiprocessor::spin::mutex::MutexCore::default()))
+        as uacpi_handle
 }
 
 /// Destroys a spinlock created by [`uacpi_kernel_create_spinlock`].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_free_spinlock(handle: uacpi_handle) {
-    let _ = handle;
-    todo!("Destroy the spinlock behind the handle.")
+    drop(unsafe {
+        Box::from_raw(handle as *mut crate::cpu::multiprocessor::spin::mutex::MutexCore)
+    });
 }
 
 /// Takes a spinlock, masking interrupts and returning the prior CPU flags. uACPI treats this as
 /// infallible.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_lock_spinlock(handle: uacpi_handle) -> uacpi_cpu_flags {
-    let _ = handle;
-    todo!("Mask interrupts, take the spinlock, and return the saved CPU flags.")
+    let spinlock = unsafe { &*(handle as *mut crate::cpu::multiprocessor::spin::mutex::MutexCore) };
+    spinlock.lock();
+    0 // Flags and interrupt save are handled internally by the spinlock implementation.
 }
 
 /// Drops a spinlock and restores the flags [`uacpi_kernel_lock_spinlock`] returned.
@@ -617,8 +655,11 @@ pub unsafe extern "C" fn uacpi_kernel_unlock_spinlock(
     handle: uacpi_handle,
     flags: uacpi_cpu_flags,
 ) {
-    let _ = (handle, flags);
-    todo!("Release the spinlock and restore the saved CPU flags.")
+    let spinlock = unsafe { &*(handle as *mut crate::cpu::multiprocessor::spin::mutex::MutexCore) };
+    unsafe {
+        spinlock.unlock();
+    }
+    let _ = flags; // Flags and interrupt restore are handled internally by the spinlock implementation.
 }
 
 /* ------------------------------------------------------------------------------------------- *
