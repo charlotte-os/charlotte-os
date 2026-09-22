@@ -23,7 +23,7 @@ use crate::logln;
 use crate::memory::PhysicalAddress;
 
 /// Prepare the deferred executor before uACPI installs any event handlers.
-pub(super) fn initialize() {
+pub fn initialize() {
     work::initialize();
 }
 

@@ -16,7 +16,8 @@ pub enum Error {
     DeviceAlreadyBoundToDriver,
 }
 
-pub trait DeviceInterface {
+/// The top level trait that all device class specific control planes must implement.
+pub trait DeviceClassControlPlane: Debug {
     type Status: Debug;
 
     fn get_status(&self) -> Box<Self::Status>;

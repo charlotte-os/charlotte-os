@@ -12,6 +12,7 @@ pub mod table_map;
 
 pub enum Error {
     IrqValOutOfRange,
+    AmlError(aml::Error),
 }
 
 pub static RSDP_ADDR: LazyLock<PhysicalAddress> = LazyLock::new(|| {

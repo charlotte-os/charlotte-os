@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![feature(cstr_bytes)]
 #![feature(extend_one)]
 #![feature(iter_advance_by)]
 #![feature(likely_unlikely)]
@@ -33,16 +34,13 @@ pub mod power_management;
 pub mod self_test;
 pub mod timers;
 
+use alloc::string::ToString;
 use core::ffi::CStr;
 use core::hint::unreachable_unchecked;
 
 use limine::mp::MpInfo;
 use spin::{Barrier, LazyLock};
-use uacpi_wrapper::{
-    UACPI_ITERATION_DECISION_NEXT_PEER,
-    UACPI_STATUS_OK,
-    uacpi_get_current_resources,
-};
+use uacpi_wrapper::{UACPI_STATUS_OK, uacpi_get_current_resources};
 
 use crate::cpu::isa::interface::interrupts::LocalIntCtlrIfce;
 use crate::cpu::isa::interface::system_info::CpuInfoIfce;
@@ -54,9 +52,9 @@ use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::cpu::scheduler::{spawn_thread_on_lp, yield_lp};
+use crate::device_management::drivers::busses::pci_express::topology::PCIE_TOPOLOGY;
 #[cfg(target_arch = "x86_64")]
 use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::IOAPIC_LIST;
-use crate::device_management::topology::DEVICE_TOPOLOGY;
 use crate::memory::KERNEL_ASID;
 
 const KERNEL_VERSION: (u64, u64, u64) = (0, 10, 0);
@@ -142,10 +140,10 @@ pub unsafe extern "C" fn ap_main(_cpuinfo: &MpInfo) -> ! {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn probe_device_topology() {
-    logln!("LP {}: Probing device topology...", (get_lp_id()));
-    let device_topology = &*DEVICE_TOPOLOGY;
-    logln!("LP {}: Device Topology:\r\n{}", (get_lp_id()), device_topology);
+pub extern "C" fn print_pcie_topology() {
+    logln!("LP {}: Probing PCIe topology...", (get_lp_id()));
+    let topology = &*PCIE_TOPOLOGY;
+    logln!("LP {}: PCIe Topology:\r\n{}", (get_lp_id()), (topology.lock().to_string()));
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -199,7 +197,7 @@ extern "C" fn initialize_platform() {
     print_ioapic_info();
     #[cfg(feature = "acpi")]
     {
-        crate::environment::acpi::aml::initialize_acpi()
+        crate::environment::acpi::aml::init::initialize_acpi()
             .unwrap_or_else(|error| panic!("ACPI initialization failed: {error}"));
         logln!("LP {}: ACPI initialization complete.", (get_lp_id()));
         unsafe {
@@ -210,6 +208,6 @@ extern "C" fn initialize_platform() {
             );
         }
     }
-    probe_device_topology();
+    print_pcie_topology();
     logln!("Platform initialization complete.");
 }

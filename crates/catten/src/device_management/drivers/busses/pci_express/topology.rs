@@ -3,6 +3,8 @@ use alloc::vec::Vec;
 use core::ops::Deref;
 use core::ptr::NonNull;
 
+use spin::LazyLock;
+
 use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::cpu::multiprocessor::spin::mutex::Mutex as SpinMutex;
 use crate::device_management::drivers::busses::pci_express::device_class::PciIdentifier;
@@ -13,8 +15,12 @@ use crate::device_management::drivers::busses::pci_express::{
     MAX_FUNCTIONS_PER_DEVICE,
     ecam,
 };
+use crate::environment::get_pcie_segment_groups;
 use crate::logln;
 use crate::memory::{PhysicalAddress, VirtualAddress};
+
+pub static PCIE_TOPOLOGY: LazyLock<SpinMutex<PcieTopology>> =
+    LazyLock::new(|| SpinMutex::new(PcieTopology::new(get_pcie_segment_groups())));
 
 pub type PcieSegmentGroupNum = u16;
 pub type PcieBusSegmentNum = u8;
