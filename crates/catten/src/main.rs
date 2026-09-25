@@ -51,7 +51,7 @@ use crate::cpu::isa::timers::print_timer_info;
 use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
-use crate::cpu::scheduler::{spawn_thread_on_lp, yield_lp};
+use crate::cpu::scheduler::{abort, spawn_thread_on_lp, yield_lp};
 use crate::device_management::drivers::busses::pci_express::topology::PCIE_TOPOLOGY;
 #[cfg(target_arch = "x86_64")]
 use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::IOAPIC_LIST;
@@ -154,6 +154,7 @@ pub extern "C" fn print_ioapic_info() {
     ioapic_list.iter().for_each(|(id, desc)| {
         logln!("Enumerated IOAPIC with ID = {:?}: {:?}", id, (desc.lock()));
     });
+    abort();
 }
 
 #[unsafe(no_mangle)]
