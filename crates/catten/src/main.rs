@@ -154,7 +154,6 @@ pub extern "C" fn print_ioapic_info() {
     ioapic_list.iter().for_each(|(id, desc)| {
         logln!("Enumerated IOAPIC with ID = {:?}: {:?}", id, (desc.lock()));
     });
-    abort();
 }
 
 #[unsafe(no_mangle)]
@@ -211,4 +210,5 @@ extern "C" fn initialize_platform() {
     }
     print_pcie_topology();
     logln!("Platform initialization complete.");
+    abort();
 }
