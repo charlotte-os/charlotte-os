@@ -1,4 +1,6 @@
 //! # Low-level operations for x86_64 Logical Processors
+mod pcie;
+pub use pcie::*;
 
 pub fn init_lp_state() {
     unsafe {

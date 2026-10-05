@@ -2,7 +2,6 @@
 
 pub mod capabilities;
 pub mod headers;
-pub mod pcie;
 
 use crate::klib::size::mebibytes;
 use crate::logln;

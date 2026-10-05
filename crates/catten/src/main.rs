@@ -51,7 +51,6 @@ use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::cpu::scheduler::{abort, spawn_thread_on_lp, yield_lp};
-use crate::device_management::drivers::busses::pci_express::topology::PCIE_TOPOLOGY;
 #[cfg(target_arch = "x86_64")]
 use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::IOAPIC_LIST;
 use crate::memory::KERNEL_ASID;
@@ -138,13 +137,6 @@ pub unsafe extern "C" fn ap_main(_cpuinfo: &MpInfo) -> ! {
     unsafe { unreachable_unchecked() }
 }
 
-#[unsafe(no_mangle)]
-pub extern "C" fn print_pcie_topology() {
-    logln!("LP {}: Probing PCIe topology...", (get_lp_id()));
-    let topology = &*PCIE_TOPOLOGY;
-    logln!("LP {}: PCIe Topology:\r\n{}", (get_lp_id()), (topology.lock().to_string()));
-}
-
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn print_ioapic_info() {
@@ -207,7 +199,6 @@ extern "C" fn initialize_platform() {
             );
         }
     }
-    print_pcie_topology();
     logln!("Platform initialization complete.");
     abort();
 }
