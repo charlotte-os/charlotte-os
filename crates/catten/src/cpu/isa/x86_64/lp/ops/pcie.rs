@@ -1,3 +1,4 @@
+use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::memory::VirtualAddress;
 
 /// Read an 8-bit value from the PCIe configuration space at the given address.
@@ -8,8 +9,8 @@ pub unsafe fn config_read8(addr: VirtualAddress) -> u8 {
     unsafe {
         core::arch::asm!(
             "mov {}, byte ptr [{}]",
-            out(reg) ret,
-            in(reg) addr,
+            out(reg_byte) ret,
+            in(reg) addr.into_mut::<u8>(),
         );
         ret
     }
@@ -24,7 +25,7 @@ pub unsafe fn config_read16(addr: VirtualAddress) -> u16 {
         core::arch::asm!(
             "mov {}, word ptr [{}]",
             out(reg) ret,
-            in(reg) addr,
+            in(reg) addr.into_mut::<u16>(),
         );
         ret
     }
@@ -39,7 +40,7 @@ pub unsafe fn config_read32(addr: VirtualAddress) -> u32 {
         core::arch::asm!(
             "mov {}, dword ptr [{}]",
             out(reg) ret,
-            in(reg) addr,
+            in(reg) addr.into_mut::<u32>(),
         );
         ret
     }
@@ -59,10 +60,11 @@ pub unsafe fn config_write8(addr: VirtualAddress, mut value: u8) {
             "mov {value}, byte ptr [{addr}]",
             /* An additional fence is not needed because the read-back ensures the write has completed
             and no loads or stores can be reordered before the read-back completes due to x86_64 guaranteeing TSO (Total Store Order) */
-            addr = in(reg) addr,
-            value = inlateout(reg) value,
+            addr = in(reg) addr.into_mut::<u8>(),
+            value = inlateout(reg_byte) value,
         );
     }
+    let _ = value;
 }
 
 /// Write a 16-bit value to the PCIe configuration space at the given address.
@@ -72,17 +74,18 @@ pub unsafe fn config_write8(addr: VirtualAddress, mut value: u8) {
 pub unsafe fn config_write16(addr: VirtualAddress, mut value: u16) {
     unsafe {
         core::arch::asm!(
-            "mov word ptr [{addr}], {value}",
+            "mov word ptr [{addr}], {value:x}",
             // The load needs to be kept after the store as its purpose is to ensure the write has completed on the PCIe fabric.
             "lfence",
             // Read back the value to ensure the write has completed before continuing.
-            "mov {value}, word ptr [{addr}]",
+            "mov {value:x}, word ptr [{addr}]",
             /* An additional fence is not needed because the read-back ensures the write has completed
             and no loads or stores can be reordered before the read-back completes due to x86_64 guaranteeing TSO (Total Store Order) */
-            addr = in(reg) addr,
+            addr = in(reg) addr.into_mut::<u16>(),
             value = inlateout(reg) value,
         );
     }
+    let _ = value;
 }
 
 /// Write a 32-bit value to the PCIe configuration space at the given address.
@@ -92,15 +95,16 @@ pub unsafe fn config_write16(addr: VirtualAddress, mut value: u16) {
 pub unsafe fn config_write32(addr: VirtualAddress, mut value: u32) {
     unsafe {
         core::arch::asm!(
-            "mov dword ptr [{addr}], {value}",
+            "mov dword ptr [{addr}], {value:e}",
             // The load needs to be kept after the store as its purpose is to ensure the write has completed on the PCIe fabric.
             "lfence",
             // Read back the value to ensure the write has completed before continuing.
-            "mov {value}, dword ptr [{addr}]",
+            "mov {value:e}, dword ptr [{addr}]",
             /* An additional fence is not needed because the read-back ensures the write has completed
             and no loads or stores can be reordered before the read-back completes due to x86_64 guaranteeing TSO (Total Store Order) */
-            addr = in(reg) addr,
+            addr = in(reg) addr.into_mut::<u32>(),
             value = inlateout(reg) value,
         );
     }
+    let _ = value;
 }

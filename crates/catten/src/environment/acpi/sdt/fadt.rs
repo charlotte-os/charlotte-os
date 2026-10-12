@@ -42,12 +42,13 @@ pub struct Fadt {
     month_alarm: u8,
     century: u8,
     // reserved in ACPI 1.0; used since ACPI 2.0+
-    boot_arch_flags: u16,
+    iapc_boot_arch: u16,
     reserved2: u8,
     flags: u32,
     reset_reg: GenericAddressStructure,
     reset_value: u8,
-    reserved3: [u8; 3],
+    arm_boot_arch: u16,
+    fadt_minor_version: u8,
     // 64-bit pointers — available on ACPI 2.0+
     x_firmware_ctrl: u64,
     x_dsdt: u64,
@@ -61,14 +62,59 @@ pub struct Fadt {
     x_gpe1_blk: GenericAddressStructure,
 }
 
-impl Fadt {
-    pub fn get_dsdt_paddr(&self) -> PhysicalAddress {
-        if self.x_dsdt != 0 {
-            PhysicalAddress::from(self.x_dsdt)
-        } else if self.dsdt != 0 {
-            PhysicalAddress::from(self.dsdt as u64)
-        } else {
-            panic!("[ACPI] The FADT does not contain a non-null physical address for the DSDT.");
+cfg_select! {
+    target_arch = "x86_64" => {
+        pub struct IapcBootArchFlags(u16);
+
+        impl IapcBootArchFlags {
+            pub fn legacy_devices_present(&self) -> bool {
+                (self.0 & 0x1) != 0
+            }
+
+            pub fn i8042_may_be_present(&self) -> bool {
+                (self.0 & 0x2) != 0
+            }
+
+            pub fn vga_not_present(&self) -> bool {
+                (self.0 & 0x4) != 0
+            }
+
+            pub fn msi_not_supported(&self) -> bool {
+                (self.0 & 0x8) != 0
+            }
+
+            pub fn pcie_aspm_control_not_available(&self) -> bool {
+                (self.0 & 0x10) != 0
+            }
+
+            pub fn rtc_not_present(&self) -> bool {
+                (self.0 & 0x20) != 0
+            }
         }
+    }
+    target_arch = "aarch64" => {
+        pub struct ArmBootArchFlags(u16);
+
+        impl ArmBootArchFlags {
+            pub fn psci_compliant(&self) -> bool {
+                (self.0 & 0x1) != 0
+            }
+
+            pub fn psci_use_hvc(&self) -> bool {
+                (self.0 & 0x2) != 0
+            }
+        }
+    }
+}
+
+impl Fadt {
+    #[cfg(target_arch = "x86_64")]
+    pub fn get_iapc_boot_arch_flags(&self) -> IapcBootArchFlags {
+        IapcBootArchFlags(self.iapc_boot_arch)
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    pub fn get_arm_boot_arch_flags(&self) -> ArmBootArchFlags {
+        ArmBootArchFlags(self.arm_boot_arch)
     }
 }
