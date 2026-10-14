@@ -3,6 +3,7 @@ use alloc::collections::VecDeque;
 
 use hashbrown::HashMap;
 
+use crate::device_management::drivers::busses::pci_express::ecam::headers::PcieCfgOffset;
 use crate::klib::size::mebibytes;
 use crate::logln;
 use crate::memory::allocators::memory::PageSize;
@@ -26,6 +27,10 @@ pub struct PcieLocation {
     pub bus_segment_num: PcieBusSegmentNum,
     pub device_num: PcieDeviceNum,
     pub function_num: PcieFunctionNum,
+}
+
+pub struct PcieTopology {
+    segment_groups: HashMap<PcieSegmentGroupNum, PcieSegmentGroup>,
 }
 
 pub struct PcieSegmentGroup {
@@ -114,6 +119,27 @@ pub struct PcieBusSegment {
     pub devices: HashMap<PcieDeviceNum, PcieDevice>,
 }
 
+impl PcieBusSegment {
+    pub fn try_new(ecam_base: VirtualAddress, bus_segment_num: PcieBusSegmentNum) -> Option<Self> {
+        // Attempt to create a new PCIe bus segment by probing the ECAM for devices.
+        // If no devices are found, return None.
+        let mut devices = HashMap::new();
+        for device_num in 0..=31 {
+            if let Some(device) = PcieDevice::try_new(ecam_base, bus_segment_num, device_num) {
+                devices.insert(device_num, device);
+            }
+        }
+        if devices.is_empty() {
+            None
+        } else {
+            Some(Self {
+                bus_segment_num,
+                devices,
+            })
+        }
+    }
+}
+
 pub struct PcieDevice {
     pub device_num: PcieDeviceNum,
     pub functions: Box<[PcieFunction]>,
@@ -124,17 +150,20 @@ pub enum PcieFunction {
     Endpoint(PcieEndpoint),
 }
 
+impl PcieFunction {
+    pub fn is_present(&self) -> bool {}
+}
+
 pub struct PcieBridge {
+    cfg_base: VirtualAddress,
+    // Parent bus segment for this bridge.
     primary_bus_segment_num: PcieBusSegmentNum,
+    // The starting bus segment number for the secondary bus behind this bridge.
     secondary_bus_segment_num: PcieBusSegmentNum,
+    // The highest bus segment number that is subordinate to this bridge.
     subordinate_bus_segment_num: PcieBusSegmentNum,
 }
-pub struct PcieEndpoint;
-
-pub struct PcieEndpointInfo {
-    pub vendor_id: u16,
-    pub device_id: u16,
-    pub class_code: u8,
-    pub subclass_code: u8,
-    pub programming_interface_code: u8,
+pub struct PcieEndpoint {
+    cfg_base: VirtualAddress,
+    cap_base: PcieCfgOffset,
 }
