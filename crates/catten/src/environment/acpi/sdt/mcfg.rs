@@ -6,7 +6,10 @@ use core::ptr::read_unaligned;
 use spin::LazyLock;
 
 use crate::cpu::isa::interface::memory::address::Address;
-use crate::device_management::drivers::busses::pci_express::topology::PcieSegmentGroup;
+use crate::device_management::drivers::busses::pci_express::topology::{
+    PcieSegmentGroup,
+    PcieSegmentGroupInfo,
+};
 use crate::environment::acpi::table_map::{AcpiTableHeader, AcpiTableType, TABLE_MAP};
 use crate::logln;
 use crate::memory::PhysicalAddress;
@@ -59,16 +62,14 @@ static MCFG_REGIONS: LazyLock<Vec<McfgEntry>> = LazyLock::new(|| {
     regions
 });
 
-pub fn parse_mcfg() -> Vec<PcieSegmentGroup> {
+pub fn parse_mcfg() -> Vec<PcieSegmentGroupInfo> {
     MCFG_REGIONS
         .iter()
-        .map(|entry| {
-            PcieSegmentGroup::new(
-                entry.pcie_segment_num,
-                PhysicalAddress::from(entry.ecam_base),
-                entry.start_bus_num,
-                entry.end_bus_num,
-            )
+        .map(|entry| PcieSegmentGroupInfo {
+            segment_group_num: entry.pcie_segment_num,
+            ecam_base: PhysicalAddress::from(entry.ecam_base),
+            start_bus: entry.start_bus_num,
+            end_bus: entry.end_bus_num,
         })
         .collect()
 }

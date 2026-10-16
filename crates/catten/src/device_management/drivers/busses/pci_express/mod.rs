@@ -9,6 +9,7 @@ pub enum Error {
     NotPciExpress,
     PciCapabilityNotFound,
     ValueOutOfRange,
+    InvalidSegmentGroup,
 }
 
 #[allow(unused)]

@@ -25,7 +25,7 @@
 
 use alloc::vec::Vec;
 
-use crate::device_management::drivers::busses::pci_express::topology::PcieSegmentGroup;
+use crate::device_management::drivers::busses::pci_express::topology::PcieSegmentGroupInfo;
 
 // Advanced Configuration and Power Interface (ACPI)
 #[cfg(any(target_arch = "x86_64", feature = "acpi"))]
@@ -40,7 +40,7 @@ pub mod riscv_sbi;
 // Unified Extensible Firmware Interface (UEFI) Runtime Services
 mod uefi_rts;
 
-pub fn get_pcie_segment_groups() -> Vec<PcieSegmentGroup> {
+pub fn get_pcie_segment_groups() -> Vec<PcieSegmentGroupInfo> {
     cfg_select! {
         all(feature = "acpi", feature = "devicetree") => {
             compile_error!(
