@@ -107,9 +107,7 @@ impl PcieTopology {
 
 /// Formats the whole PCIe topology as a tree with one line per segment group, bus segment and
 /// function. Lines are separated by `\r\n` as required by `logln!` and the output has no trailing
-/// line break, so it is intended to be logged with a single `logln!("{}", topology)`. Make sure
-/// `PCIE_TOPOLOGY` has already been initialized before doing so since enumeration itself logs and
-/// `logln!` holds the console lock while evaluating its arguments.
+/// line break, so it is intended to be logged with a single `logln!("{}", topology)`.
 impl Display for PcieTopology {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "PCIe Topology ({} segment group(s)):", self.segment_groups.len())?;

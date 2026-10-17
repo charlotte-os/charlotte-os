@@ -87,3 +87,15 @@ impl Write for EarlyConsole {
 /// The mutex masks interrupts on the locking LP for as long as it is held, so a line cannot be
 /// interleaved with one from an interrupt handler on the same processor or from another LP.
 pub static EARLY_CONSOLE: Mutex<EarlyConsole> = Mutex::new(EarlyConsole::new());
+
+/// Writes `s` straight to the early console's device without taking [`EARLY_CONSOLE`]'s lock.
+///
+/// This exists only for output from an exception or NMI that interrupted its own LP while that LP
+/// held the lock, where waiting for it would never end. The interrupted holder is suspended until
+/// the handler returns, and the device itself is stateless apart from its one-time initialisation,
+/// before which the backends either drop bytes or send them through a path that needs none.
+pub(super) fn write_str_unlocked(s: &str) {
+    for byte in s.as_bytes() {
+        backend::write_byte(*byte);
+    }
+}

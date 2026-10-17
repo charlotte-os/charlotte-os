@@ -200,10 +200,7 @@ extern "C" fn initialize_platform() {
             );
         }
     }
-    // Enumeration logs as it runs and `logln!` holds the console lock while evaluating its
-    // arguments, so the topology must be initialized before it is passed to `logln!`.
-    let pcie_topology = &*PCIE_TOPOLOGY;
-    logln!("{}", pcie_topology);
+    logln!("{}", (*PCIE_TOPOLOGY));
     logln!("Platform initialization complete.");
     abort();
 }
