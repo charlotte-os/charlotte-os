@@ -22,6 +22,9 @@ display = ["dep:ft-wrapper"]
 yield_trace = []
 virtio_gpu = ["display"]
 qemu = ["virtio_gpu"]
+# Includes the names of every device in the PCI ID Repository rather than only those of key vendors.
+# This adds roughly a megabyte to the kernel image.
+pci_ids_full = []
 
 [dependencies]
 limine = { version = ">=0.6.5" }

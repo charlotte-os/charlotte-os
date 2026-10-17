@@ -13,6 +13,14 @@ precedence = "closest"
 SPDX-FileCopyrightText = "2022-2026 Mintsuki and contributors"
 SPDX-License-Identifier = "BSD-2-Clause"
 
+# The PCI ID Repository database (https://pci-ids.ucw.cz/), vendored verbatim and used by
+# catten's build script to generate PCI vendor, device and class name tables.
+[[annotations]]
+path = ["crates/catten/vendor/pci-ids/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "Martin Mares and Albert Pool"
+SPDX-License-Identifier = "GPL-2.0-or-later OR BSD-3-Clause"
+
 # Upstream uACPI, vendored verbatim and built by the uacpi-wrapper crate.
 [[annotations]]
 path = ["crates/uacpi-wrapper/vendor/uacpi/**"]

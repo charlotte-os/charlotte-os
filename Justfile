@@ -158,6 +158,9 @@ qemu-run-riscv64 profile="debug" gdb="false": (create-image "riscv64" profile)
         -serial chardev:catlog \
         {{ if gdb == "true" {"-s -S"} else {""} }}
 
+update-pci-ids:
+    curl -fsSL https://pci-ids.ucw.cz/v2.2/pci.ids -o crates/catten/vendor/pci-ids/pci.ids
+
 update-loc:
     tokei \
         --exclude target \

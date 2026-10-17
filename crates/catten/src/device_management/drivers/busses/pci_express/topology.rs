@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
+use core::fmt::{self, Display, Formatter};
 
 use hashbrown::HashMap;
 
@@ -14,6 +15,7 @@ use crate::cpu::isa::lp::ops::{
 };
 use crate::cpu::multiprocessor::spin::rwlock::RwLock;
 use crate::device_management::drivers::busses::pci_express;
+use crate::device_management::drivers::busses::pci_express::device_class::PciIdentifier;
 use crate::device_management::drivers::busses::pci_express::device_class::vendor_id::VENDOR_ID_UNKNOWN;
 use crate::device_management::drivers::busses::pci_express::ecam::headers::bridge::{
     PRIMARY_BUS_NUMBER,
@@ -21,8 +23,12 @@ use crate::device_management::drivers::busses::pci_express::ecam::headers::bridg
     SUBORDINATE_BUS_NUMBER,
 };
 use crate::device_management::drivers::busses::pci_express::ecam::headers::{
+    CLASS,
+    DEVICE_ID,
     HEADER_TYPE,
+    PROG_IF,
     PcieCfgOffset,
+    SUBCLASS,
     VENDOR_ID,
 };
 use crate::klib::size::mebibytes;
@@ -53,6 +59,25 @@ pub struct PcieLocation {
     pub function_num: PcieFunctionNum,
 }
 
+/// Formats the location in the conventional `SSSS:BB:DD.F` notation.
+impl Display for PcieLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{:04x}:{:02x}:{:02x}.{:x}",
+            self.segment_group_num, self.bus_segment_num, self.device_num, self.function_num
+        )
+    }
+}
+
+/// Returns the keys of `map` in ascending order so that the topology is always logged in a
+/// deterministic order regardless of the hash map's iteration order.
+fn sorted_keys<K: Copy + Ord, V>(map: &HashMap<K, V>) -> Vec<K> {
+    let mut keys: Vec<K> = map.keys().copied().collect();
+    keys.sort_unstable();
+    keys
+}
+
 #[derive(Debug)]
 pub struct PcieTopology {
     segment_groups: HashMap<PcieSegmentGroupNum, PcieSegmentGroup>,
@@ -80,6 +105,21 @@ impl PcieTopology {
     }
 }
 
+/// Formats the whole PCIe topology as a tree with one line per segment group, bus segment and
+/// function. Lines are separated by `\r\n` as required by `logln!` and the output has no trailing
+/// line break, so it is intended to be logged with a single `logln!("{}", topology)`. Make sure
+/// `PCIE_TOPOLOGY` has already been initialized before doing so since enumeration itself logs and
+/// `logln!` holds the console lock while evaluating its arguments.
+impl Display for PcieTopology {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "PCIe Topology ({} segment group(s)):", self.segment_groups.len())?;
+        for sg_num in sorted_keys(&self.segment_groups) {
+            write!(f, "{}", self.segment_groups[&sg_num])?;
+        }
+        Ok(())
+    }
+}
+
 pub struct PcieSegmentGroupInfo {
     pub segment_group_num: PcieSegmentGroupNum,
     pub ecam_base: PhysicalAddress,
@@ -91,7 +131,29 @@ pub struct PcieSegmentGroupInfo {
 pub struct PcieSegmentGroup {
     pub segment_group_num: PcieSegmentGroupNum,
     ecam_base: VirtualAddress,
+    pub start_bus: PcieBusSegmentNum,
+    pub end_bus: PcieBusSegmentNum,
     pub bus_segments: HashMap<PcieBusSegmentNum, PcieBusSegment>,
+}
+
+/// Each line written by this implementation is preceded by a line break so that it can be
+/// directly appended to the line written by the enclosing `PcieTopology`.
+impl Display for PcieSegmentGroup {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "\r\n  Segment Group {:04x} | buses {:02x}-{:02x} | ECAM @ {:?} | {} bus segment(s)",
+            self.segment_group_num,
+            self.start_bus,
+            self.end_bus,
+            self.ecam_base,
+            self.bus_segments.len()
+        )?;
+        for bus_num in sorted_keys(&self.bus_segments) {
+            write!(f, "{}", self.bus_segments[&bus_num])?;
+        }
+        Ok(())
+    }
 }
 
 impl PcieSegmentGroup {
@@ -141,15 +203,20 @@ impl PcieSegmentGroup {
 
     fn enumerate_bus_segments(
         segment_group_num: PcieSegmentGroupNum,
+        ecam_base: VirtualAddress,
         start_bus: PcieBusSegmentNum,
         end_bus: PcieBusSegmentNum,
     ) -> HashMap<PcieBusSegmentNum, PcieBusSegment> {
         let mut bus_segments = HashMap::new();
         let mut bus_segs_to_enumerate = VecDeque::from([start_bus]);
         while let Some(bus_num) = bus_segs_to_enumerate.pop_front() {
-            // Only enumerate bus segments within the current bus segment's decode range
-            if bus_num >= start_bus && bus_num <= end_bus {
-                if let Some(mut bus_segment) = PcieBusSegment::try_new(segment_group_num, bus_num) {
+            // Only enumerate bus segments within the current bus segment's decode range. Already
+            // enumerated bus segments are skipped so that misconfigured bridges (e.g. ones whose
+            // secondary bus number is still 0) can't cause the same bus to be enumerated forever.
+            if bus_num >= start_bus && bus_num <= end_bus && !bus_segments.contains_key(&bus_num) {
+                if let Some(mut bus_segment) =
+                    PcieBusSegment::try_new(segment_group_num, ecam_base, bus_num)
+                {
                     bus_segs_to_enumerate.extend((&mut bus_segment).get_immediate_downstreams());
                     bus_segments.insert(bus_num, bus_segment);
                 }
@@ -163,8 +230,11 @@ impl PcieSegmentGroup {
         Self {
             segment_group_num: info.segment_group_num,
             ecam_base,
+            start_bus: info.start_bus,
+            end_bus: info.end_bus,
             bus_segments: Self::enumerate_bus_segments(
                 info.segment_group_num,
+                ecam_base,
                 info.start_bus,
                 info.end_bus,
             ),
@@ -177,17 +247,28 @@ pub struct PcieBusSegment {
     pub devices: HashMap<PcieDeviceNum, PcieDevice>,
 }
 
+impl Display for PcieBusSegment {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "\r\n    Bus {:02x} | {} device(s)", self.bus_segment_num, self.devices.len())?;
+        for device_num in sorted_keys(&self.devices) {
+            write!(f, "{}", self.devices[&device_num])?;
+        }
+        Ok(())
+    }
+}
+
 impl PcieBusSegment {
     pub fn try_new(
         segment_group_num: PcieSegmentGroupNum,
+        ecam_base: VirtualAddress,
         bus_segment_num: PcieBusSegmentNum,
     ) -> Option<Self> {
         // Attempt to create a new PCIe bus segment by probing the ECAM for devices.
         // If no devices are found, return None.
         let mut devices = HashMap::new();
-        for device_num in 0..=31 {
+        for device_num in 0..MAX_PCIE_DEVICES_PER_BUS_SEGMENT as PcieDeviceNum {
             if let Some(device) =
-                PcieDevice::try_new(segment_group_num, bus_segment_num, device_num)
+                PcieDevice::try_new(segment_group_num, ecam_base, bus_segment_num, device_num)
             {
                 devices.insert(device_num, device);
             }
@@ -217,28 +298,46 @@ pub struct PcieDevice {
     pub functions: Box<[PcieFunction]>,
 }
 
+/// Functions are written one per line since they are what actually carry the identifying
+/// information; the device itself is only a grouping of functions sharing a device number.
+impl Display for PcieDevice {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for func in &self.functions {
+            write!(f, "\r\n      {}", func)?;
+        }
+        Ok(())
+    }
+}
+
 impl PcieDevice {
     pub fn try_new(
         segment_group_num: PcieSegmentGroupNum,
+        ecam_base: VirtualAddress,
         bus_segment_num: PcieBusSegmentNum,
         device_num: PcieDeviceNum,
     ) -> Option<Self> {
         let mut functions = Vec::new();
-        if let Some(func) = PcieFunction::try_get(PcieLocation {
-            segment_group_num,
-            bus_segment_num,
-            device_num,
-            function_num: 0,
-        }) {
+        if let Some(func) = PcieFunction::try_get(
+            ecam_base,
+            PcieLocation {
+                segment_group_num,
+                bus_segment_num,
+                device_num,
+                function_num: 0,
+            },
+        ) {
             functions.push(func);
             if functions[0].is_multifunction() {
-                for function_num in 1..=7 {
-                    if let Some(func) = PcieFunction::try_get(PcieLocation {
-                        segment_group_num,
-                        bus_segment_num,
-                        device_num,
-                        function_num,
-                    }) {
+                for function_num in 1..MAX_PCIE_FUNCTIONS_PER_DEVICE as PcieFunctionNum {
+                    if let Some(func) = PcieFunction::try_get(
+                        ecam_base,
+                        PcieLocation {
+                            segment_group_num,
+                            bus_segment_num,
+                            device_num,
+                            function_num,
+                        },
+                    ) {
                         functions.push(func);
                     }
                 }
@@ -279,7 +378,29 @@ fn compute_cfg_base(
 
 #[derive(Debug)]
 pub struct PcieFunction {
+    pub location: PcieLocation,
     cfg_base: VirtualAddress,
+}
+
+/// Writes a single line describing the function: its location, header type, the identifying
+/// information along with the device interface this kernel recognizes it as, and for bridges the
+/// bus segment numbers they connect.
+impl Display for PcieFunction {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if self.is_bridge() {
+            write!(
+                f,
+                "{} [bridge]   {} primary bus {:02x}, secondary bus {:02x}, subordinate bus {:02x}",
+                self.location,
+                self.identifier(),
+                self.cfg_read8(PRIMARY_BUS_NUMBER.offset),
+                self.cfg_read8(SECONDARY_BUS_NUMBER.offset),
+                self.cfg_read8(SUBORDINATE_BUS_NUMBER.offset)
+            )
+        } else {
+            write!(f, "{} [endpoint] {}", self.location, self.identifier())
+        }
+    }
 }
 
 impl PcieFunction {
@@ -325,14 +446,24 @@ impl PcieFunction {
         self.cfg_read8(HEADER_TYPE.offset) & (1 << 7) != 0
     }
 
-    fn try_get(loc: PcieLocation) -> Option<Self> {
-        let cfg_base = compute_cfg_base(
-            PCIE_TOPOLOGY.segment_group_to_ecam_base(loc.segment_group_num).ok()?,
-            loc.bus_segment_num,
-            loc.device_num,
-            loc.function_num,
-        );
+    pub fn identifier(&self) -> PciIdentifier {
+        PciIdentifier {
+            vendor_id: self.cfg_read16(VENDOR_ID.offset),
+            device_id: self.cfg_read16(DEVICE_ID.offset),
+            class_code: self.cfg_read8(CLASS.offset),
+            subclass: self.cfg_read8(SUBCLASS.offset),
+            prog_if: self.cfg_read8(PROG_IF.offset),
+        }
+    }
+
+    /// The ECAM base is passed in rather than looked up in `PCIE_TOPOLOGY` because functions are
+    /// probed while `PCIE_TOPOLOGY` itself is still being initialized, and accessing it from
+    /// within its own initializer would deadlock.
+    fn try_get(ecam_base: VirtualAddress, loc: PcieLocation) -> Option<Self> {
+        let cfg_base =
+            compute_cfg_base(ecam_base, loc.bus_segment_num, loc.device_num, loc.function_num);
         let func = Self {
+            location: loc,
             cfg_base,
         };
         if func.is_present() {

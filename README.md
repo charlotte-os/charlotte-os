@@ -124,6 +124,8 @@ Community contributions for new hardware support will only be accepted when they
 
 The Charlotte Operating System is licensed under the GNU Affero General Public License version 3.0 (or any later version). By contributing, you agree that your work may be distributed under the AGPL version 3.0 or later.
 
+The kernel's PCI vendor, device and class names are generated from the [PCI ID Repository](https://pci-ids.ucw.cz/) database (Copyright Martin Mares and Albert Pool), vendored in `crates/catten/vendor/pci-ids` and used under the 3-clause BSD License.
+
 ---
 
 ## Community

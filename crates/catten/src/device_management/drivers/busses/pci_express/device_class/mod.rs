@@ -1,8 +1,10 @@
 mod constants;
+pub mod pci_ids;
 
 use core::fmt::Display;
 
 pub use constants::*;
+use pci_ids::PciClassDescription;
 
 use crate::device_management::hw_interface::HwDeviceIfce;
 
@@ -21,19 +23,39 @@ pub struct PciIdentifier {
     pub prog_if: u8,
 }
 
+/// Formats as `| Vendor[0xvvvv]:Device[0xdddd] | Kernel Interface | Class Description[codes] |`
+/// where the device name is omitted when it is not known.
 impl Display for PciIdentifier {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
-            "| {}[0x{:04x}]:0x{:04x} | {}[class 0x{:02x}, subclass 0x{:02x}, prog IF 0x{:02x}] |",
+            "| {}[0x{:04x}]:",
             constants::vendor_id::pci_vendor_id_to_str(self.vendor_id),
-            self.vendor_id,
+            self.vendor_id
+        )?;
+        if let Some(device) = device_id::pci_device_id_to_str(self.vendor_id, self.device_id) {
+            write!(f, "{device}")?;
+        }
+        write!(
+            f,
+            "[0x{:04x}] | {} | {}[class 0x{:02x}, subclass 0x{:02x}, prog IF 0x{:02x}] |",
             self.device_id,
             Into::<HwDeviceIfce>::into(*self),
+            self.class_description(),
             self.class_code,
             self.subclass,
             self.prog_if,
         )
+    }
+}
+
+impl PciIdentifier {
+    pub fn class_description(&self) -> PciClassDescription {
+        PciClassDescription {
+            class_code: self.class_code,
+            subclass: self.subclass,
+            prog_if: self.prog_if,
+        }
     }
 }
 
