@@ -51,6 +51,7 @@ use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::cpu::scheduler::{abort, spawn_thread_on_lp, yield_lp};
+use crate::device_management::drivers::busses::pci_express::topology::PCIE_TOPOLOGY;
 #[cfg(target_arch = "x86_64")]
 use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::IOAPIC_LIST;
 use crate::memory::KERNEL_ASID;
@@ -199,6 +200,7 @@ extern "C" fn initialize_platform() {
             );
         }
     }
+    logln!("{:?}", (*PCIE_TOPOLOGY));
     logln!("Platform initialization complete.");
     abort();
 }

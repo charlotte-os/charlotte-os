@@ -23,7 +23,7 @@ pub unsafe fn config_read16(addr: VirtualAddress) -> u16 {
     let mut ret: u16;
     unsafe {
         core::arch::asm!(
-            "mov {}, word ptr [{}]",
+            "mov {:x}, word ptr [{}]",
             out(reg) ret,
             in(reg) addr.into_mut::<u16>(),
         );
@@ -38,7 +38,7 @@ pub unsafe fn config_read32(addr: VirtualAddress) -> u32 {
     let mut ret: u32;
     unsafe {
         core::arch::asm!(
-            "mov {}, dword ptr [{}]",
+            "mov {:e}, dword ptr [{}]",
             out(reg) ret,
             in(reg) addr.into_mut::<u32>(),
         );

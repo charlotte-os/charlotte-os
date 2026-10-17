@@ -15,6 +15,11 @@ use crate::cpu::isa::lp::ops::{
 use crate::cpu::multiprocessor::spin::rwlock::RwLock;
 use crate::device_management::drivers::busses::pci_express;
 use crate::device_management::drivers::busses::pci_express::device_class::vendor_id::VENDOR_ID_UNKNOWN;
+use crate::device_management::drivers::busses::pci_express::ecam::headers::bridge::{
+    PRIMARY_BUS_NUMBER,
+    SECONDARY_BUS_NUMBER,
+    SUBORDINATE_BUS_NUMBER,
+};
 use crate::device_management::drivers::busses::pci_express::ecam::headers::{
     HEADER_TYPE,
     PcieCfgOffset,
@@ -37,8 +42,8 @@ const MAX_PCIE_BUS_SEGMENTS_PER_SEGMENT_GROUP: usize = 256;
 const MAX_PCIE_DEVICES_PER_BUS_SEGMENT: usize = 32;
 const MAX_PCIE_FUNCTIONS_PER_DEVICE: usize = 8;
 
-static PCIE_TOPOLOGY: spin::LazyLock<RwLock<PcieTopology>> =
-    spin::LazyLock::new(|| RwLock::new(PcieTopology::new(environment::get_pcie_segment_groups())));
+pub static PCIE_TOPOLOGY: spin::LazyLock<PcieTopology> =
+    spin::LazyLock::new(|| PcieTopology::new(environment::get_pcie_segment_groups()));
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PcieLocation {
@@ -48,6 +53,7 @@ pub struct PcieLocation {
     pub function_num: PcieFunctionNum,
 }
 
+#[derive(Debug)]
 pub struct PcieTopology {
     segment_groups: HashMap<PcieSegmentGroupNum, PcieSegmentGroup>,
 }
@@ -81,6 +87,7 @@ pub struct PcieSegmentGroupInfo {
     pub end_bus: PcieBusSegmentNum,
 }
 
+#[derive(Debug)]
 pub struct PcieSegmentGroup {
     pub segment_group_num: PcieSegmentGroupNum,
     ecam_base: VirtualAddress,
@@ -139,13 +146,13 @@ impl PcieSegmentGroup {
     ) -> HashMap<PcieBusSegmentNum, PcieBusSegment> {
         let mut bus_segments = HashMap::new();
         let mut bus_segs_to_enumerate = VecDeque::from([start_bus]);
-        for bus_num in bus_segs_to_enumerate {
-            if let Some(bus_segment) = PcieBusSegment::try_new(segment_group_num, bus_num) {
-                bus_segments.insert(bus_num, bus_segment);
-                todo!(
-                    "Implement enumeration of downstream buses from all bridges in this PCIe bus \
-                     segment"
-                );
+        while let Some(bus_num) = bus_segs_to_enumerate.pop_front() {
+            // Only enumerate bus segments within the current bus segment's decode range
+            if bus_num >= start_bus && bus_num <= end_bus {
+                if let Some(mut bus_segment) = PcieBusSegment::try_new(segment_group_num, bus_num) {
+                    bus_segs_to_enumerate.extend((&mut bus_segment).get_immediate_downstreams());
+                    bus_segments.insert(bus_num, bus_segment);
+                }
             }
         }
         bus_segments
@@ -164,7 +171,7 @@ impl PcieSegmentGroup {
         }
     }
 }
-
+#[derive(Debug)]
 pub struct PcieBusSegment {
     pub bus_segment_num: PcieBusSegmentNum,
     pub devices: HashMap<PcieDeviceNum, PcieDevice>,
@@ -194,8 +201,17 @@ impl PcieBusSegment {
             })
         }
     }
+
+    fn get_immediate_downstreams(&mut self) -> Vec<PcieBusSegmentNum> {
+        let mut downstreams = Vec::new();
+        for device in self.devices.values_mut() {
+            downstreams.extend(device.get_immediate_downstreams());
+        }
+        downstreams
+    }
 }
 
+#[derive(Debug)]
 pub struct PcieDevice {
     pub device_num: PcieDeviceNum,
     pub functions: Box<[PcieFunction]>,
@@ -237,6 +253,16 @@ impl PcieDevice {
             })
         }
     }
+
+    fn get_immediate_downstreams(&mut self) -> Vec<PcieBusSegmentNum> {
+        let mut downstreams = Vec::new();
+        for func in &mut self.functions {
+            if let PcieFunctionType::Bridge(bridge) = PcieFunctionType::from(func) {
+                downstreams.push(bridge.downstream_start_bus_seg());
+            }
+        }
+        downstreams
+    }
 }
 
 fn compute_cfg_base(
@@ -251,6 +277,7 @@ fn compute_cfg_base(
         + ((function_num as usize) << 12)
 }
 
+#[derive(Debug)]
 pub struct PcieFunction {
     cfg_base: VirtualAddress,
 }
@@ -300,7 +327,7 @@ impl PcieFunction {
 
     fn try_get(loc: PcieLocation) -> Option<Self> {
         let cfg_base = compute_cfg_base(
-            PCIE_TOPOLOGY.read().segment_group_to_ecam_base(loc.segment_group_num).ok()?,
+            PCIE_TOPOLOGY.segment_group_to_ecam_base(loc.segment_group_num).ok()?,
             loc.bus_segment_num,
             loc.device_num,
             loc.function_num,
@@ -317,6 +344,20 @@ impl PcieFunction {
 }
 
 pub struct PcieBridge<'a>(&'a mut PcieFunction);
+
+impl<'a> PcieBridge<'a> {
+    fn upstream_bus_seg(&self) -> PcieBusSegmentNum {
+        self.0.cfg_read8(PRIMARY_BUS_NUMBER.offset)
+    }
+
+    fn downstream_start_bus_seg(&self) -> PcieBusSegmentNum {
+        self.0.cfg_read8(SECONDARY_BUS_NUMBER.offset)
+    }
+
+    fn downstream_end_bus_seg(&self) -> PcieBusSegmentNum {
+        self.0.cfg_read8(SUBORDINATE_BUS_NUMBER.offset)
+    }
+}
 pub struct PcieEndpoint<'a>(&'a mut PcieFunction);
 
 impl<'a> PcieEndpoint<'a> {
