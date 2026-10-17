@@ -105,6 +105,8 @@ cfg_select! {
             }
         }
     }
+    // The FADT defines no boot architecture flags for any other ISA.
+    _ => {}
 }
 
 impl Fadt {

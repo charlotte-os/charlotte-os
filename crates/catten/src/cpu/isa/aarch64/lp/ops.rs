@@ -153,3 +153,51 @@ pub unsafe extern "C" fn user_trampoline() -> ! {
 pub unsafe extern "C" fn kernel_thread_trampoline() -> ! {
     todo!("Unmask interrupts and call the kernel thread entry point held in a saved register.")
 }
+
+/* PCIe ECAM Configuration Access
+
+These mirror the x86_64 accessors, which use dedicated instructions to guarantee that every access
+reaches the device exactly once, in order, and has completed before the next one begins.
+*/
+
+/// Read a 8-bit value from the PCIe configuration space at the given address.
+///
+/// Safety: The caller must ensure that the address points to a 8-bit register in a PCIe ECAM.
+pub unsafe fn config_read8(_addr: VirtualAddress) -> u8 {
+    todo!("Implement AArch64 PCIe ECAM reads ordered with DSB/DMB barriers.")
+}
+
+/// Read a 16-bit value from the PCIe configuration space at the given address.
+///
+/// Safety: The caller must ensure that the address points to a 16-bit register in a PCIe ECAM.
+pub unsafe fn config_read16(_addr: VirtualAddress) -> u16 {
+    todo!("Implement AArch64 PCIe ECAM reads ordered with DSB/DMB barriers.")
+}
+
+/// Read a 32-bit value from the PCIe configuration space at the given address.
+///
+/// Safety: The caller must ensure that the address points to a 32-bit register in a PCIe ECAM.
+pub unsafe fn config_read32(_addr: VirtualAddress) -> u32 {
+    todo!("Implement AArch64 PCIe ECAM reads ordered with DSB/DMB barriers.")
+}
+
+/// Write a 8-bit value to the PCIe configuration space at the given address.
+///
+/// Safety: The caller must ensure that the address points to a 8-bit register in a PCIe ECAM.
+pub unsafe fn config_write8(_addr: VirtualAddress, _value: u8) {
+    todo!("Implement AArch64 PCIe ECAM writes ordered with DSB/DMB barriers.")
+}
+
+/// Write a 16-bit value to the PCIe configuration space at the given address.
+///
+/// Safety: The caller must ensure that the address points to a 16-bit register in a PCIe ECAM.
+pub unsafe fn config_write16(_addr: VirtualAddress, _value: u16) {
+    todo!("Implement AArch64 PCIe ECAM writes ordered with DSB/DMB barriers.")
+}
+
+/// Write a 32-bit value to the PCIe configuration space at the given address.
+///
+/// Safety: The caller must ensure that the address points to a 32-bit register in a PCIe ECAM.
+pub unsafe fn config_write32(_addr: VirtualAddress, _value: u32) {
+    todo!("Implement AArch64 PCIe ECAM writes ordered with DSB/DMB barriers.")
+}
