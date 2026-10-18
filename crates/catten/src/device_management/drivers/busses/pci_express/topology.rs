@@ -17,7 +17,9 @@ use crate::cpu::multiprocessor::spin::rwlock::{RwLock, RwLockWriteGuard};
 use crate::device_management::drivers::busses::pci_express;
 use crate::device_management::drivers::busses::pci_express::device_class::PciIdentifier;
 use crate::device_management::drivers::busses::pci_express::device_class::vendor_id::VENDOR_ID_UNKNOWN;
+use crate::device_management::drivers::busses::pci_express::ecam::capabilities::CapabilityIter;
 use crate::device_management::drivers::busses::pci_express::ecam::headers::bridge::{
+    CAPABILITIES_POINTER,
     PRIMARY_BUS_NUMBER,
     SECONDARY_BUS_NUMBER,
     SUBORDINATE_BUS_NUMBER,
@@ -402,31 +404,31 @@ impl Display for PcieFunction {
 }
 
 impl PcieFunction {
-    fn cfg_read8(&self, offset: PcieCfgOffset) -> u8 {
+    pub fn cfg_read8(&self, offset: PcieCfgOffset) -> u8 {
         unsafe { config_read8(self.cfg_base + <PcieCfgOffset as Into<usize>>::into(offset)) }
     }
 
-    fn cfg_read16(&self, offset: PcieCfgOffset) -> u16 {
+    pub fn cfg_read16(&self, offset: PcieCfgOffset) -> u16 {
         unsafe { config_read16(self.cfg_base + <PcieCfgOffset as Into<usize>>::into(offset)) }
     }
 
-    fn cfg_read32(&self, offset: PcieCfgOffset) -> u32 {
+    pub fn cfg_read32(&self, offset: PcieCfgOffset) -> u32 {
         unsafe { config_read32(self.cfg_base + <PcieCfgOffset as Into<usize>>::into(offset)) }
     }
 
-    fn cfg_write8(&mut self, offset: PcieCfgOffset, value: u8) {
+    pub fn cfg_write8(&mut self, offset: PcieCfgOffset, value: u8) {
         unsafe {
             config_write8(self.cfg_base + <PcieCfgOffset as Into<usize>>::into(offset), value)
         }
     }
 
-    fn cfg_write16(&mut self, offset: PcieCfgOffset, value: u16) {
+    pub fn cfg_write16(&mut self, offset: PcieCfgOffset, value: u16) {
         unsafe {
             config_write16(self.cfg_base + <PcieCfgOffset as Into<usize>>::into(offset), value)
         }
     }
 
-    fn cfg_write32(&mut self, offset: PcieCfgOffset, value: u32) {
+    pub fn cfg_write32(&mut self, offset: PcieCfgOffset, value: u32) {
         unsafe {
             config_write32(self.cfg_base + <PcieCfgOffset as Into<usize>>::into(offset), value)
         }
@@ -452,6 +454,14 @@ impl PcieFunction {
             subclass: self.cfg_read8(SUBCLASS.offset),
             prog_if: self.cfg_read8(PROG_IF.offset),
         }
+    }
+
+    pub fn get_capability_offset(&self) -> PcieCfgOffset {
+        self.cfg_read8(CAPABILITIES_POINTER.offset).into()
+    }
+
+    pub fn get_capability_iter<'a>(&'a mut self) -> CapabilityIter<'a> {
+        CapabilityIter::new(self)
     }
 
     /// The ECAM base is passed in rather than looked up in `PCIE_TOPOLOGY` because functions are

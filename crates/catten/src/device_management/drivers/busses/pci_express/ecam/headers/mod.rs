@@ -1,5 +1,8 @@
+use crate::device_management::drivers::busses::pci_express;
+
 const PCI_CFG_SPACE_SIZE: u16 = 4096;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PcieCfgOffset(u16);
 
 impl PcieCfgOffset {
@@ -8,16 +11,34 @@ impl PcieCfgOffset {
         Self(offset)
     }
 
-    pub fn try_new(offset: u16) -> Option<Self> {
-        if offset < PCI_CFG_SPACE_SIZE {
-            Some(Self(offset))
-        } else {
-            None
-        }
-    }
-
     pub const fn raw(&self) -> u16 {
         self.0
+    }
+}
+
+impl TryFrom<u16> for PcieCfgOffset {
+    type Error = pci_express::Error;
+
+    fn try_from(value: u16) -> Result<Self, Self::Error> {
+        if value < PCI_CFG_SPACE_SIZE {
+            Ok(Self(value))
+        } else {
+            Err(pci_express::Error::CfgOffsetOutOfRange)
+        }
+    }
+}
+
+impl From<u8> for PcieCfgOffset {
+    fn from(value: u8) -> Self {
+        Self(value as u16)
+    }
+}
+
+impl core::ops::Add<u8> for PcieCfgOffset {
+    type Output = PcieCfgOffset;
+
+    fn add(self, rhs: u8) -> Self::Output {
+        PcieCfgOffset(self.0 + rhs as u16)
     }
 }
 
