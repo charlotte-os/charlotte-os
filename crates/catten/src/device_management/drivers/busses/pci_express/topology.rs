@@ -13,7 +13,7 @@ use crate::cpu::isa::lp::ops::{
     config_write16,
     config_write32,
 };
-use crate::cpu::multiprocessor::spin::rwlock::RwLock;
+use crate::cpu::multiprocessor::spin::rwlock::{RwLock, RwLockWriteGuard};
 use crate::device_management::drivers::busses::pci_express;
 use crate::device_management::drivers::busses::pci_express::device_class::PciIdentifier;
 use crate::device_management::drivers::busses::pci_express::device_class::vendor_id::VENDOR_ID_UNKNOWN;
@@ -80,7 +80,7 @@ fn sorted_keys<K: Copy + Ord, V>(map: &HashMap<K, V>) -> Vec<K> {
 
 #[derive(Debug)]
 pub struct PcieTopology {
-    segment_groups: HashMap<PcieSegmentGroupNum, PcieSegmentGroup>,
+    segment_groups: HashMap<PcieSegmentGroupNum, RwLock<PcieSegmentGroup>>,
 }
 
 impl PcieTopology {
@@ -90,14 +90,14 @@ impl PcieTopology {
     ) -> Result<VirtualAddress, pci_express::Error> {
         self.segment_groups
             .get(&segment_group_num)
-            .map(|sg| sg.ecam_base)
+            .map(|sg| sg.read().ecam_base)
             .ok_or(pci_express::Error::InvalidSegmentGroup)
     }
 
     fn new(segment_group_info: Vec<PcieSegmentGroupInfo>) -> Self {
         let mut segment_groups = HashMap::new();
         for info in segment_group_info {
-            segment_groups.insert(info.segment_group_num, PcieSegmentGroup::new(info));
+            segment_groups.insert(info.segment_group_num, RwLock::new(PcieSegmentGroup::new(info)));
         }
         Self {
             segment_groups,
@@ -112,7 +112,7 @@ impl Display for PcieTopology {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "PCIe Topology ({} segment group(s)):", self.segment_groups.len())?;
         for sg_num in sorted_keys(&self.segment_groups) {
-            write!(f, "{}", self.segment_groups[&sg_num])?;
+            write!(f, "{}", self.segment_groups[&sg_num].read())?;
         }
         Ok(())
     }
@@ -242,14 +242,14 @@ impl PcieSegmentGroup {
 #[derive(Debug)]
 pub struct PcieBusSegment {
     pub bus_segment_num: PcieBusSegmentNum,
-    pub devices: HashMap<PcieDeviceNum, PcieDevice>,
+    pub devices: HashMap<PcieDeviceNum, RwLock<PcieDevice>>,
 }
 
 impl Display for PcieBusSegment {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "\r\n    Bus {:02x} | {} device(s)", self.bus_segment_num, self.devices.len())?;
         for device_num in sorted_keys(&self.devices) {
-            write!(f, "{}", self.devices[&device_num])?;
+            write!(f, "{}", self.devices[&device_num].read())?;
         }
         Ok(())
     }
@@ -268,7 +268,7 @@ impl PcieBusSegment {
             if let Some(device) =
                 PcieDevice::try_new(segment_group_num, ecam_base, bus_segment_num, device_num)
             {
-                devices.insert(device_num, device);
+                devices.insert(device_num, RwLock::new(device));
             }
         }
         if devices.is_empty() {
@@ -284,7 +284,7 @@ impl PcieBusSegment {
     fn get_immediate_downstreams(&mut self) -> Vec<PcieBusSegmentNum> {
         let mut downstreams = Vec::new();
         for device in self.devices.values_mut() {
-            downstreams.extend(device.get_immediate_downstreams());
+            downstreams.extend(device.write().get_immediate_downstreams());
         }
         downstreams
     }
@@ -293,7 +293,7 @@ impl PcieBusSegment {
 #[derive(Debug)]
 pub struct PcieDevice {
     pub device_num: PcieDeviceNum,
-    pub functions: Box<[PcieFunction]>,
+    pub functions: Box<[RwLock<PcieFunction>]>,
 }
 
 /// Functions are written one per line since they are what actually carry the identifying
@@ -301,7 +301,7 @@ pub struct PcieDevice {
 impl Display for PcieDevice {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for func in &self.functions {
-            write!(f, "\r\n      {}", func)?;
+            write!(f, "\r\n      {}", func.read())?;
         }
         Ok(())
     }
@@ -324,8 +324,8 @@ impl PcieDevice {
                 function_num: 0,
             },
         ) {
-            functions.push(func);
-            if functions[0].is_multifunction() {
+            functions.push(RwLock::new(func));
+            if functions[0].read().is_multifunction() {
                 for function_num in 1..MAX_PCIE_FUNCTIONS_PER_DEVICE as PcieFunctionNum {
                     if let Some(func) = PcieFunction::try_get(
                         ecam_base,
@@ -336,7 +336,7 @@ impl PcieDevice {
                             function_num,
                         },
                     ) {
-                        functions.push(func);
+                        functions.push(RwLock::new(func));
                     }
                 }
             }
@@ -354,7 +354,7 @@ impl PcieDevice {
     fn get_immediate_downstreams(&mut self) -> Vec<PcieBusSegmentNum> {
         let mut downstreams = Vec::new();
         for func in &mut self.functions {
-            if let PcieFunctionType::Bridge(bridge) = PcieFunctionType::from(func) {
+            if let PcieFunctionType::Bridge(bridge) = PcieFunctionType::from(func.write()) {
                 downstreams.push(bridge.downstream_start_bus_seg());
             }
         }
@@ -472,7 +472,7 @@ impl PcieFunction {
     }
 }
 
-pub struct PcieBridge<'a>(&'a mut PcieFunction);
+pub struct PcieBridge<'a>(RwLockWriteGuard<'a, PcieFunction>);
 
 impl<'a> PcieBridge<'a> {
     fn upstream_bus_seg(&self) -> PcieBusSegmentNum {
@@ -487,7 +487,7 @@ impl<'a> PcieBridge<'a> {
         self.0.cfg_read8(SUBORDINATE_BUS_NUMBER.offset)
     }
 }
-pub struct PcieEndpoint<'a>(&'a mut PcieFunction);
+pub struct PcieEndpoint<'a>(RwLockWriteGuard<'a, PcieFunction>);
 
 impl<'a> PcieEndpoint<'a> {
     const CAP_EXT_BASE: PcieCfgOffset = PcieCfgOffset::new_const(256);
@@ -498,8 +498,8 @@ pub enum PcieFunctionType<'a> {
     Endpoint(PcieEndpoint<'a>),
 }
 
-impl<'a> From<&'a mut PcieFunction> for PcieFunctionType<'a> {
-    fn from(func: &'a mut PcieFunction) -> Self {
+impl<'a> From<RwLockWriteGuard<'a, PcieFunction>> for PcieFunctionType<'a> {
+    fn from(func: RwLockWriteGuard<'a, PcieFunction>) -> Self {
         if func.is_bridge() {
             PcieFunctionType::Bridge(PcieBridge(func))
         } else {
