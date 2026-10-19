@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 
-use crate::cpu::multiprocessor::spin::rwlock::RwLockWriteGuard;
 use crate::device_management::drivers::busses::pci_express::ecam::headers::PcieCfgOffset;
 use crate::device_management::drivers::busses::pci_express::topology::PcieFunction;
 

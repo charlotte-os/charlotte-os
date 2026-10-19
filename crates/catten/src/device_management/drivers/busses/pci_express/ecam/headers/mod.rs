@@ -34,11 +34,23 @@ impl From<u8> for PcieCfgOffset {
     }
 }
 
-impl core::ops::Add<u8> for PcieCfgOffset {
+impl<T: Into<u16>> core::ops::Add<T> for PcieCfgOffset {
     type Output = PcieCfgOffset;
 
-    fn add(self, rhs: u8) -> Self::Output {
-        PcieCfgOffset(self.0 + rhs as u16)
+    fn add(self, rhs: T) -> Self::Output {
+        let rhs: u16 = rhs.into();
+        let new_offset = self.0 + rhs;
+        if new_offset < PCI_CFG_SPACE_SIZE {
+            PcieCfgOffset(new_offset)
+        } else {
+            panic!("CfgOffset overflow");
+        }
+    }
+}
+
+impl Into<u16> for PcieCfgOffset {
+    fn into(self) -> u16 {
+        self.0
     }
 }
 

@@ -1,3 +1,4 @@
+pub mod capabilities;
 pub mod device_class;
 mod ecam;
 pub mod topology;
@@ -11,4 +12,5 @@ pub enum Error {
     ValueOutOfRange,
     InvalidSegmentGroup,
     CfgOffsetOutOfRange,
+    InvalidCapability,
 }
