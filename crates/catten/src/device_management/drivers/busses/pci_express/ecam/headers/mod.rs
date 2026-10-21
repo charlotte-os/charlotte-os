@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use crate::device_management::drivers::busses::pci_express;
 
 const PCI_CFG_SPACE_SIZE: u16 = 4096;

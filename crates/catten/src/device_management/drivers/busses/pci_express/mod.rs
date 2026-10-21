@@ -13,4 +13,5 @@ pub enum Error {
     InvalidSegmentGroup,
     CfgOffsetOutOfRange,
     InvalidCapability,
+    MsiError(capabilities::standard::msi::Error),
 }

@@ -77,28 +77,28 @@ impl<'a> MsiXCapHandle<'a> {
         self.func_handle.cfg_write16(self.cap_offset + MESSAGE_CONTROL_OFFSET, message_control);
     }
 
-    pub fn msix_table_loc(&self) -> MsixTableLoc {
+    pub fn find_msix_table(&self) -> MsixTableLocation {
         let table_offset = self.func_handle.cfg_read32(self.cap_offset + TABLE_OFFSET_REG_OFFSET);
         let bar_index = (table_offset & OFFSET_REG_BIR_MASK) as u8;
         let offset = table_offset & OFFSET_REG_OFFSET_MASK;
-        MsixTableLoc {
+        MsixTableLocation {
             bar_index,
             offset,
         }
     }
 
-    pub fn pba_table_loc(&self) -> MsixTableLoc {
+    pub fn find_pba_table(&self) -> MsixTableLocation {
         let pba_offset = self.func_handle.cfg_read32(self.cap_offset + PBA_OFFSET_REG_OFFSET);
         let bar_index = (pba_offset & OFFSET_REG_BIR_MASK) as u8;
         let offset = pba_offset & OFFSET_REG_OFFSET_MASK;
-        MsixTableLoc {
+        MsixTableLocation {
             bar_index,
             offset,
         }
     }
 }
 
-pub struct MsixTableLoc {
+pub struct MsixTableLocation {
     pub bar_index: u8,
     pub offset: u32,
 }
