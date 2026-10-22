@@ -1,4 +1,5 @@
-use crate::device_management::drivers::busses::pci_express;
+//! Message Signalled Interrupts
+
 use crate::device_management::drivers::busses::pci_express::ecam::headers::PcieCfgOffset;
 use crate::device_management::drivers::busses::pci_express::topology::PcieFunction;
 use crate::memory::PhysicalAddress;
@@ -9,6 +10,9 @@ const MSI_CAP_ID: u8 = 0x05;
 const MESSAGE_CONTROL_OFFSET: u8 = 0x02;
 const MSI_ADDR_OFFSET: u8 = 0x04;
 const MSI_ADDR_UPPER_OFFSET: u8 = 0x08;
+const MESSAGE_DATA_OFFSET: u8 = 0x08;
+const MASK_BITS_OFFSET: u8 = 0x0c;
+const PENDING_BITS_OFFSET: u8 = 0x10;
 
 /// MSI message control register bit shifts and masks
 const MSI_ENABLE_BIT_SHIFT: u16 = 0;
@@ -24,6 +28,7 @@ pub enum Error {
     InvalidAllocVecCount,
     ExtendedMessageDataNotSupported,
     AddressOutOfRange,
+    PerVectorMaskingNotSupported,
 }
 
 pub struct MsiCapHandle<'a> {
@@ -156,5 +161,70 @@ impl<'a> MsiCapHandle<'a> {
             }
             Ok(())
         }
+    }
+
+    fn corrected_message_data_offset(&self) -> u8 {
+        let mut offset = MESSAGE_DATA_OFFSET;
+        if self.is_64bit_addr_capable() {
+            offset += 4;
+        }
+        offset
+    }
+
+    pub fn set_message_data(&mut self, data: u16) {
+        self.func_handle.cfg_write16(self.cap_offset + self.corrected_message_data_offset(), data);
+    }
+
+    pub fn set_message_data_ext(&mut self, data: u32) -> Result<(), Error> {
+        if !self.is_extended_message_data_enabled() {
+            Err(Error::ExtendedMessageDataNotSupported)
+        } else {
+            self.func_handle
+                .cfg_write32(self.cap_offset + self.corrected_message_data_offset(), data);
+            Ok(())
+        }
+    }
+
+    fn corrected_mask_bits_offset(&self) -> Result<u8, Error> {
+        if !self.is_per_vector_masking_capable() {
+            Err(Error::PerVectorMaskingNotSupported)
+        } else {
+            let mut offset = MASK_BITS_OFFSET;
+            if self.is_64bit_addr_capable() {
+                offset += 4;
+            }
+            Ok(offset)
+        }
+    }
+
+    pub fn get_mask_bits(&self) -> Result<u32, Error> {
+        let offset = self.corrected_mask_bits_offset()?;
+        Ok(self.func_handle.cfg_read32(self.cap_offset + offset))
+    }
+
+    pub fn set_mask_bits(&mut self, mask: u32) -> Result<(), Error> {
+        let offset = self.corrected_mask_bits_offset()?;
+        self.func_handle.cfg_write32(self.cap_offset + offset, mask);
+        Ok(())
+    }
+
+    fn corrected_pending_bits_offset(&self) -> Result<u8, Error> {
+        if !self.is_per_vector_masking_capable() {
+            Err(Error::PerVectorMaskingNotSupported)
+        } else {
+            let mut offset = PENDING_BITS_OFFSET;
+            if self.is_64bit_addr_capable() {
+                offset += 4;
+            }
+            if self.is_extended_message_data_capable() {
+                offset += 4;
+            }
+            Ok(offset)
+        }
+    }
+
+    pub fn get_pending_bits(&self) -> Result<u32, Error> {
+        let offset = self.corrected_pending_bits_offset()?;
+        Ok(self.func_handle.cfg_read32(self.cap_offset + offset))
     }
 }

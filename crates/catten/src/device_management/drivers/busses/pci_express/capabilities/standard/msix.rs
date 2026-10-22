@@ -1,3 +1,5 @@
+//! Message Signalled Interrupts - eXtended (MSI-X)
+
 use crate::device_management::drivers::busses::pci_express::ecam::headers::PcieCfgOffset;
 use crate::device_management::drivers::busses::pci_express::topology::PcieFunction;
 use crate::device_management::drivers::busses::pci_express::{self};
