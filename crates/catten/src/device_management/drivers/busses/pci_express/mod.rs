@@ -1,3 +1,4 @@
+mod bar_io;
 pub mod capabilities;
 pub mod device_class;
 mod ecam;
