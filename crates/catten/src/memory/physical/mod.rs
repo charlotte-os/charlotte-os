@@ -2,6 +2,7 @@
 //!
 //! This module is responsible for managing physical memory. It provides an interface for allocating
 //! and freeing physical memory frames.
+pub mod shared;
 
 use limine::memmap::MEMMAP_USABLE;
 pub use limine::request::MemmapResponse;

@@ -8,18 +8,21 @@ pub enum Error {
     InvalidPageAttributes,
 }
 
+/// Represents the usage type of a memory page independent of the underlying hardware or
+/// architecture.
+/// This abstraction encodes the access permissions and cache attributes of a virtual memory page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PageType {
     NotPresent,
-    KernelCode,         //read, execute
-    KernelData,         //read, write
-    KernelRoData,       //read only
-    UserCode,           //user, read, execute
-    UserData,           //user, read, write
-    UserRoData,         //user, read only
-    Mmio,               //read, write, no caching
-    DirectMemoryAccess, //read, write, no caching
-    Framebuffer,        //read, write, write combining
+    KernelCode,         //read, execute; writeback
+    KernelData,         //read, write; writeback
+    KernelRoData,       //read only; write-protected
+    UserCode,           //user, read, execute; writeback
+    UserData,           //user, read, write; writeback
+    UserRoData,         //user, read only; write-protected
+    Mmio,               //read, write, no caching; strong uncacheable
+    DirectMemoryAccess, //read, write, no caching; writeback
+    Framebuffer,        //read, write; write combining
 }
 
 impl PageType {

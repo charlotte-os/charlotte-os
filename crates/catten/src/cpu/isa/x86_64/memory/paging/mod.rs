@@ -1,3 +1,4 @@
+mod hhdm_punchout;
 pub mod pte;
 pub mod pth_walker;
 use core::arch::asm;
