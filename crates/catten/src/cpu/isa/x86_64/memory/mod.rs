@@ -4,8 +4,7 @@ pub mod tlb;
 
 pub use crate::cpu::isa::interface::memory::MemoryInterface;
 use crate::cpu::isa::memory::address::paddr::PhysicalAddressError;
-use crate::memory::linear::Error as VMemError;
-use crate::memory::physical::Error as PMemError;
+use crate::memory::{linear, physical};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
@@ -16,27 +15,35 @@ pub enum Error {
     VAddrNotLargePageAligned,
     VAddrNotHugePageAligned,
     NoRequestedVAddrRegionAvailable,
-    PMemError(PMemError),
-    VMemError(VMemError),
+    PhysicalMemoryError(physical::Error),
+    VirtualMemoryError(linear::Error),
+    SharedMemoryManagerError(physical::shared::Error),
 }
 
-impl From<PMemError> for Error {
-    fn from(err: PMemError) -> Self {
-        Error::PMemError(err)
+impl From<physical::Error> for Error {
+    fn from(err: physical::Error) -> Self {
+        Error::PhysicalMemoryError(err)
     }
 }
 
 impl From<PhysicalAddressError> for Error {
     fn from(err: PhysicalAddressError) -> Self {
-        Error::PMemError(PMemError::PAddrError(err))
+        Error::PhysicalMemoryError(physical::Error::PAddrError(err))
     }
 }
 
-impl From<VMemError> for Error {
-    fn from(err: VMemError) -> Self {
-        Error::VMemError(err)
+impl From<linear::Error> for Error {
+    fn from(err: linear::Error) -> Self {
+        Error::VirtualMemoryError(err)
     }
 }
+
+impl From<physical::shared::Error> for Error {
+    fn from(err: physical::shared::Error) -> Self {
+        Error::SharedMemoryManagerError(err)
+    }
+}
+
 pub struct MemoryInterfaceImpl;
 
 impl MemoryInterface for MemoryInterfaceImpl {

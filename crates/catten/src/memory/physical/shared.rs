@@ -1,4 +1,5 @@
 use hashbrown::HashMap;
+use spin::LazyLock;
 
 use crate::cpu::isa::interface::memory::address::Address;
 use crate::cpu::multiprocessor::spin::rwlock::RwLock;
@@ -6,6 +7,10 @@ use crate::memory::PhysicalAddress;
 use crate::memory::linear::PageType;
 use crate::memory::physical::PAGE_FRAME_SIZE;
 
+pub static SHARED_MEMORY_MANAGER: LazyLock<SharedMemoryManager> =
+    LazyLock::new(SharedMemoryManager::default);
+
+#[derive(Debug, Clone, Copy)]
 pub enum Error {
     InvalidFrameNum,
     FrameAlreadyShared,
@@ -25,7 +30,7 @@ pub struct SharedMemoryManager {
 
 impl SharedMemoryManager {
     pub fn mark_shared(
-        &mut self,
+        &self,
         frame_num: PhysicalAddress,
         frame: SharedPhysFrame,
     ) -> Result<(), Error> {
@@ -38,7 +43,7 @@ impl SharedMemoryManager {
         }
     }
 
-    pub fn increment_handle_count(&mut self, frame_num: PhysicalAddress) -> Result<(), Error> {
+    pub fn increment_handle_count(&self, frame_num: PhysicalAddress) -> Result<(), Error> {
         if let Some(frame) = self.frames.read().get(&frame_num) {
             frame.write().handle_count += 1;
             Ok(())
@@ -47,7 +52,7 @@ impl SharedMemoryManager {
         }
     }
 
-    pub fn decrement_handle_count(&mut self, frame_num: PhysicalAddress) -> Result<(), Error> {
+    pub fn decrement_handle_count(&self, frame_num: PhysicalAddress) -> Result<(), Error> {
         if let Some(frame) = self.frames.read().get(&frame_num) {
             let mut frame = frame.write();
             if frame.handle_count > 0 {
@@ -64,7 +69,7 @@ impl SharedMemoryManager {
         }
     }
 
-    pub fn increment_mapping_count(&mut self, frame_num: PhysicalAddress) -> Result<(), Error> {
+    pub fn increment_mapping_count(&self, frame_num: PhysicalAddress) -> Result<(), Error> {
         if let Some(frame) = self.frames.read().get(&frame_num) {
             frame.write().mapping_count += 1;
             Ok(())
@@ -73,7 +78,7 @@ impl SharedMemoryManager {
         }
     }
 
-    pub fn decrement_mapping_count(&mut self, frame_num: PhysicalAddress) -> Result<(), Error> {
+    pub fn decrement_mapping_count(&self, frame_num: PhysicalAddress) -> Result<(), Error> {
         if let Some(frame) = self.frames.read().get(&frame_num) {
             let mut frame = frame.write();
             if frame.mapping_count > 0 {
@@ -89,4 +94,14 @@ impl SharedMemoryManager {
             Err(Error::FrameNotShared)
         }
     }
+
+    pub fn is_shared(&self, frame_num: PhysicalAddress) -> Result<bool, Error> {
+        if frame_num.is_aligned_to(PAGE_FRAME_SIZE) {
+            Ok(self.frames.read().contains_key(&frame_num))
+        } else {
+            Err(Error::InvalidFrameNum)
+        }
+    }
 }
+
+unsafe impl Sync for SharedMemoryManager {}

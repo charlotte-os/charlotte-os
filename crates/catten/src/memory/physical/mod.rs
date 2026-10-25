@@ -18,7 +18,7 @@ use crate::klib::size::kibibytes;
 use crate::memory::allocators::memory::PageSize;
 
 /// Page frames are 4 KiB in size on all supported architectures.
-const PAGE_FRAME_SIZE: usize = kibibytes(4);
+pub const PAGE_FRAME_SIZE: usize = kibibytes(4);
 
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
