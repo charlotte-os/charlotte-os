@@ -15,7 +15,7 @@ pub trait MemoryInterface {
     const PAGE_SIZE: usize;
 }
 
-pub trait AddressSpaceInterface {
+pub trait AddressSpaceInterface: Clone {
     const PAGE_SIZE: usize;
     const LARGE_PAGE_SIZE: usize;
     const HUGE_PAGE_SIZE: usize;

@@ -8,13 +8,12 @@
 use core::ptr::NonNull;
 
 use super::{PAGE_SIZE, is_pagetable_unused};
-use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
+use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
 use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface};
 use crate::cpu::isa::x86_64::memory::address::paddr::PhysicalAddress;
 use crate::cpu::isa::x86_64::memory::address::vaddr::VirtualAddress;
 use crate::memory::PHYSICAL_FRAME_ALLOCATOR;
 
-const CR3_ADDRESS_MASK: u64 = 0x000ffffffffff000;
 type WalkerError = <super::MemoryInterfaceImpl as MemoryInterface>::Error;
 type WalkerResult<T> = Result<T, WalkerError>;
 
@@ -50,9 +49,7 @@ impl<'vas> PthWalker<'vas> {
     }
 
     fn root_table_ptr(&self) -> *mut super::PageTable {
-        PhysicalAddress::try_from((self.address_space.cr3 & CR3_ADDRESS_MASK) as usize)
-            .unwrap()
-            .into()
+        self.address_space.root_addr.into()
     }
 
     fn walk_next_level(
@@ -120,10 +117,9 @@ impl<'vas> PthWalker<'vas> {
             // Obtain the PML4 table pointer; all address spaces must have a top level page
             // table as they are all required to map the kernel and
             // higher half memory.
-            if self.address_space.cr3 & CR3_ADDRESS_MASK == 0 {
+            if self.address_space.root_addr.is_null() {
                 let new_pml4 = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame()?;
-                self.address_space.cr3 =
-                    <PhysicalAddress as Into<u64>>::into(new_pml4) & CR3_ADDRESS_MASK;
+                self.address_space.root_addr = new_pml4;
                 self.address_space.load().expect("Error reloading the CR3 register");
             }
             self.pml4_ptr = self.root_table_ptr();

@@ -71,6 +71,12 @@ impl TryFrom<u16> for HwAsid {
     }
 }
 
+impl From<u64> for HwAsid {
+    fn from(value: u64) -> Self {
+        HwAsid((value & 0xfff) as u16)
+    }
+}
+
 pub const PAGE_SIZE: usize = 4096;
 pub const N_PAGE_TABLE_ENTRIES: usize = 512;
 pub type PageTable = [pte::PageTableEntry; N_PAGE_TABLE_ENTRIES];
@@ -86,10 +92,10 @@ pub fn is_pagetable_unused(table_ptr: NonNull<PageTable>) -> bool {
     true
 }
 
-#[repr(transparent)]
 pub struct AddressSpace {
     // control register 3 i.e. top level page table base register
-    cr3: u64,
+    root_addr: PhysicalAddress,
+    hw_asid: Option<HwAsid>,
 }
 
 impl AddressSpace {
@@ -111,7 +117,12 @@ impl AddressSpace {
     }
 
     pub fn get_cr3(&self) -> u64 {
-        self.cr3
+        <PhysicalAddress as Into<u64>>::into(self.root_addr)
+            | if let Some(hw_asid) = self.hw_asid {
+                hw_asid.get_inner() as u64
+            } else {
+                0u64
+            }
     }
 }
 
@@ -126,14 +137,15 @@ impl AddressSpaceInterface for AddressSpace {
             asm!("mov {}, cr3", out(reg) cr3);
         }
         AddressSpace {
-            cr3: cr3,
+            root_addr: PhysicalAddress::from(cr3 & !0xfff),
+            hw_asid: Some(HwAsid::from(cr3 & 0xfff)),
         }
     }
 
     fn load(&self) -> Result<(), <MemoryInterfaceImpl as MemoryInterface>::Error> {
         unsafe {
             // Set the top level page table base register
-            asm!("mov cr3, {}", in(reg) self.cr3);
+            asm!("mov cr3, {}", in(reg) self.get_cr3());
         }
         Ok(())
     }
@@ -423,5 +435,11 @@ impl AddressSpaceInterface for AddressSpace {
             }
             Err(e) => Err(e),
         }
+    }
+}
+
+impl Clone for AddressSpace {
+    fn clone(&self) -> Self {
+        todo!()
     }
 }
