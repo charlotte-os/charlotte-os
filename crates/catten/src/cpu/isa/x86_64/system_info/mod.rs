@@ -5,6 +5,7 @@ use core::mem::transmute;
 
 use spin::lazylock::LazyLock;
 
+use crate::cpu::isa::constants;
 use crate::cpu::isa::interface::system_info::CpuInfoIfce;
 
 pub static IS_CPUID_SUPPORTED: LazyLock<bool> = LazyLock::new(is_cpuid_supported);
@@ -94,8 +95,22 @@ impl CpuInfoIfce for CpuInfo {
     }
 
     fn get_vaddr_sig_bits() -> u8 {
-        let cpuid_result = __cpuid_count(0x80000008, 0);
-        ((cpuid_result.eax >> 8) & 0xff) as u8
+        if Self::is_extension_supported(IsaExtension::La57) {
+            let mut cr4: u64;
+            unsafe {
+                core::arch::asm! {
+                    "mov {}, cr4",
+                    out(reg) cr4
+                }
+            }
+            if cr4 & constants::crs::CR4_LA57_ENABLE_BIT != 0 {
+                57
+            } else {
+                48
+            }
+        } else {
+            48
+        }
     }
 
     fn is_extension_supported(extension: Self::IsaExtension) -> bool {

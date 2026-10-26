@@ -254,13 +254,6 @@ impl AddressSpaceInterface for AddressSpace {
         &mut self,
         mapping: MemoryMapping,
     ) -> Result<(), <MemoryInterfaceImpl as MemoryInterface>::Error> {
-        if SHARED_MEMORY_MANAGER.is_shared(mapping.paddr).unwrap_or(false) {
-            SHARED_MEMORY_MANAGER.increment_mapping_count(mapping.paddr)?;
-        } else {
-            unsafe {
-                hhdm_punchout::punch_out_frame(mapping.paddr);
-            }
-        }
         let mut walker = pth_walker::PthWalker::new(self, mapping.vaddr);
         walker.map_page(
             mapping.paddr,
@@ -283,31 +276,13 @@ impl AddressSpaceInterface for AddressSpace {
             return Err(<MemoryInterfaceImpl as MemoryInterface>::Error::VAddrNotPageAligned);
         }
         let mut walker = pth_walker::PthWalker::new(self, vaddr);
-        let frame_num = walker.unmap_page()?;
-        if SHARED_MEMORY_MANAGER.is_shared(frame_num).unwrap_or(false) {
-            SHARED_MEMORY_MANAGER.decrement_mapping_count(frame_num)?;
-        } else {
-            unsafe {
-                hhdm_punchout::punch_in_frame(frame_num);
-            }
-        }
-        Ok(frame_num)
+        walker.unmap_page()
     }
 
     fn map_large_page(
         &mut self,
         mapping: MemoryMapping,
     ) -> Result<(), <MemoryInterfaceImpl as MemoryInterface>::Error> {
-        for i in 0..(Self::LARGE_PAGE_SIZE / PAGE_FRAME_SIZE) {
-            let frame_num = mapping.paddr + i * PAGE_FRAME_SIZE;
-            if SHARED_MEMORY_MANAGER.is_shared(frame_num).unwrap_or(false) {
-                SHARED_MEMORY_MANAGER.increment_mapping_count(frame_num)?;
-            } else {
-                unsafe {
-                    hhdm_punchout::punch_out_frame(frame_num);
-                }
-            }
-        }
         let mut walker = pth_walker::PthWalker::new(self, mapping.vaddr);
         walker.map_large_page(
             mapping.paddr,
@@ -330,34 +305,13 @@ impl AddressSpaceInterface for AddressSpace {
             return Err(<MemoryInterfaceImpl as MemoryInterface>::Error::VAddrNotLargePageAligned);
         }
         let mut walker = pth_walker::PthWalker::new(self, vaddr);
-        let base_frame_num = walker.unmap_large_page()?;
-        for i in 0..(Self::LARGE_PAGE_SIZE / PAGE_FRAME_SIZE) {
-            let frame_num = base_frame_num + i * PAGE_FRAME_SIZE;
-            if SHARED_MEMORY_MANAGER.is_shared(frame_num).unwrap_or(false) {
-                SHARED_MEMORY_MANAGER.decrement_mapping_count(frame_num)?;
-            } else {
-                unsafe {
-                    hhdm_punchout::punch_in_frame(frame_num);
-                }
-            }
-        }
-        Ok(base_frame_num)
+        walker.unmap_large_page()
     }
 
     fn map_huge_page(
         &mut self,
         mapping: MemoryMapping,
     ) -> Result<(), <MemoryInterfaceImpl as MemoryInterface>::Error> {
-        for i in 0..(Self::HUGE_PAGE_SIZE / PAGE_FRAME_SIZE) {
-            let frame_num = mapping.paddr + i * PAGE_FRAME_SIZE;
-            if SHARED_MEMORY_MANAGER.is_shared(frame_num).unwrap_or(false) {
-                SHARED_MEMORY_MANAGER.increment_mapping_count(frame_num)?;
-            } else {
-                unsafe {
-                    hhdm_punchout::punch_out_frame(frame_num);
-                }
-            }
-        }
         let mut walker = pth_walker::PthWalker::new(self, mapping.vaddr);
         walker.map_huge_page(
             mapping.paddr,
@@ -380,18 +334,7 @@ impl AddressSpaceInterface for AddressSpace {
             return Err(<MemoryInterfaceImpl as MemoryInterface>::Error::VAddrNotHugePageAligned);
         }
         let mut walker = pth_walker::PthWalker::new(self, vaddr);
-        let base_frame_num = walker.unmap_huge_page()?;
-        for i in 0..(Self::HUGE_PAGE_SIZE / PAGE_FRAME_SIZE) {
-            let frame_num = base_frame_num + i * PAGE_FRAME_SIZE;
-            if SHARED_MEMORY_MANAGER.is_shared(frame_num).unwrap_or(false) {
-                SHARED_MEMORY_MANAGER.decrement_mapping_count(frame_num)?;
-            } else {
-                unsafe {
-                    hhdm_punchout::punch_in_frame(frame_num);
-                }
-            }
-        }
-        Ok(base_frame_num)
+        walker.unmap_huge_page()
     }
 
     fn is_mapped(
