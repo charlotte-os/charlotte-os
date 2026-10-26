@@ -11,10 +11,10 @@ use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
 use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface, MemoryMapping};
 use crate::klib::size::{gibibytes, kibibytes, mebibytes};
 use crate::logln;
-use crate::memory::PhysicalAddress;
 use crate::memory::linear::PageType;
 use crate::memory::physical::PAGE_FRAME_SIZE;
 use crate::memory::physical::shared::SHARED_MEMORY_MANAGER;
+use crate::memory::{PHYSICAL_FRAME_ALLOCATOR, PhysicalAddress};
 
 /// Use the bootloader's PAT layout instead of assuming a particular WC/UC index.
 /// Leaf entries select device memory as UC; ordinary RAM stays write-back.
@@ -440,6 +440,14 @@ impl AddressSpaceInterface for AddressSpace {
 
 impl Clone for AddressSpace {
     fn clone(&self) -> Self {
-        todo!()
+        let new_root_addr = PHYSICAL_FRAME_ALLOCATOR.lock().allocate_frame().expect(
+            "Failed to allocate a page frame for use as the top level page table while cloning an \
+             address space.",
+        );
+        todo!("Deep copy the entire address space inlcluding the page tables and mapped frames");
+        Self {
+            root_addr: new_root_addr,
+            hw_asid: None,
+        }
     }
 }
