@@ -42,7 +42,6 @@ pub struct RoundRobin {
     timer_event_observer: Arc<super::TimerEventObserver>,
     run_queue: VecDeque<ThreadHandle>,
     current_handle: Option<ThreadHandle>,
-    hwasid_map: HashMap<AddressSpaceId, HwAsid>,
 }
 
 impl RoundRobin {
@@ -54,7 +53,6 @@ impl RoundRobin {
             timer_event_observer: Arc::new(super::TimerEventObserver(AtomicBool::default())),
             run_queue: VecDeque::new(),
             current_handle: None,
-            hwasid_map: HashMap::new(),
         }
     }
 
@@ -168,10 +166,6 @@ impl LpScheduler for RoundRobin {
 
     fn stop(&mut self) {
         self.is_idle = true;
-    }
-
-    fn asid_to_hwasid(&self, asid: AddressSpaceId) -> Option<HwAsid> {
-        self.hwasid_map.get(&asid).cloned()
     }
 
     fn thread_count(&self) -> ThreadCount {

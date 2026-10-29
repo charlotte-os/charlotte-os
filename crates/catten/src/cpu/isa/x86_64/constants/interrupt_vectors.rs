@@ -7,8 +7,7 @@ pub static DYN_VEC_START_OFFSET: u8 = 35;
 
 pub const EXCEPTION_VECTOR_RANGE: core::ops::RangeInclusive<u8> = 0..=31;
 pub const LAPIC_TIMER_VECTOR: u8 = 32;
-pub const ASYNC_IPI_VECTOR: u8 = 33;
-pub const SYNC_IPI_VECTOR: u8 = 34;
+pub const IPI_DOORBELL_VECTOR: u8 = 33;
 pub const SPURIOUS_INTERRUPT_VECTOR_NUM: u8 = 255;
 
 pub static FIXED_INTERRUPT_VECTORS: LazyLock<HashSet<u8>> = LazyLock::new(|| {
@@ -17,8 +16,7 @@ pub static FIXED_INTERRUPT_VECTORS: LazyLock<HashSet<u8>> = LazyLock::new(|| {
         set.insert(i);
     }
     set.insert(LAPIC_TIMER_VECTOR);
-    set.insert(ASYNC_IPI_VECTOR);
-    set.insert(SYNC_IPI_VECTOR);
+    set.insert(IPI_DOORBELL_VECTOR);
     set.insert(SPURIOUS_INTERRUPT_VECTOR_NUM);
     set
 });

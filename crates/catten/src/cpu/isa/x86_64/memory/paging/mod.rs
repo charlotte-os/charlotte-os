@@ -1,4 +1,3 @@
-mod hhdm_punchout;
 pub mod pte;
 pub mod pth_walker;
 use core::arch::asm;
@@ -12,8 +11,6 @@ use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface,
 use crate::klib::size::{gibibytes, kibibytes, mebibytes};
 use crate::logln;
 use crate::memory::linear::PageType;
-use crate::memory::physical::PAGE_FRAME_SIZE;
-use crate::memory::physical::shared::SHARED_MEMORY_MANAGER;
 use crate::memory::{PHYSICAL_FRAME_ALLOCATOR, PhysicalAddress};
 
 /// Use the bootloader's PAT layout instead of assuming a particular WC/UC index.

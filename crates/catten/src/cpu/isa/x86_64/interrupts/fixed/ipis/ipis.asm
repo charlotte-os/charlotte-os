@@ -49,20 +49,9 @@ sync_ipi_barrier:
     .8byte 0
 
 .section .text
-.global isr_asynchronous_ipi
-isr_asynchronous_ipi:
+.global isr_ipi_doorbell
+isr_ipi_doorbell:
     IPI_PROLOGUE
     call ih_asynchronous_ipi
-    IPI_EPILOGUE
-    iretq
-
-.global isr_synchronous_ipi
-isr_synchronous_ipi:
-    IPI_PROLOGUE
-    call ih_synchronous_ipi
-    lock dec qword ptr [sync_ipi_barrier]
-barrier_loop:
-    lock cmp qword ptr [sync_ipi_barrier], 0
-    jnz barrier_loop
     IPI_EPILOGUE
     iretq

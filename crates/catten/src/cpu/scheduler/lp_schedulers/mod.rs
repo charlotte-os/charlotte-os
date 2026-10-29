@@ -4,10 +4,8 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::cpu::isa::lp::LpId;
-use crate::cpu::isa::memory::paging::HwAsid;
 use crate::cpu::scheduler::threads::{ThreadCount, ThreadId};
 use crate::klib::observer::Observer;
-use crate::memory::AddressSpaceId;
 
 pub trait LpScheduler: Debug + Send {
     fn get_lp_id(&self) -> LpId;
@@ -26,7 +24,6 @@ pub trait LpScheduler: Debug + Send {
     fn is_idle(&self) -> bool;
     fn start(&mut self);
     fn stop(&mut self);
-    fn asid_to_hwasid(&self, asid: AddressSpaceId) -> Option<HwAsid>;
     fn thread_count(&self) -> ThreadCount;
 }
 
