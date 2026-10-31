@@ -52,6 +52,6 @@ sync_ipi_barrier:
 .global isr_ipi_doorbell
 isr_ipi_doorbell:
     IPI_PROLOGUE
-    call ih_asynchronous_ipi
+    call ih_ipi_doorbell
     IPI_EPILOGUE
     iretq

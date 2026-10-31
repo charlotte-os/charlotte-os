@@ -57,7 +57,8 @@ pub unsafe fn assign_id() {
     store_lp_id(lp_id);
     if lp_id == 0 {
         early_logln!(
-            "Logical Processor with local interrupt controller ID = {} has been designated LP {}.",
+            "Logical Processor with local interrupt controller ID = {} has been designated LP
+        {}.",
             (get_lic_id()),
             (get_lp_id())
         );

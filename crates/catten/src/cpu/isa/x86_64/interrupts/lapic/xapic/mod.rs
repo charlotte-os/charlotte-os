@@ -1,22 +1,23 @@
-//! # x2APIC Local Advanced Programmable Interrupt Controller
+//! # xAPIC Local Advanced Programmable Interrupt Controller
 mod id;
+mod io;
 
-use core::arch::asm;
 use core::mem::MaybeUninit;
 
 use spin::LazyLock;
 
-use super::super::constants::interrupt_vectors::*;
+use crate::cpu::isa::constants::interrupt_vectors::*;
 use crate::cpu::isa::interface::interrupts::LocalIntCtlrIfce;
 use crate::cpu::isa::interface::timers::LpTimerIfce;
 use crate::cpu::isa::interrupts::Error;
+use crate::cpu::isa::interrupts::lapic::xapic::io::xapic_io_write32;
 use crate::cpu::isa::lp::{IntSrcDscr, LpId};
 use crate::cpu::isa::timers::apic_timer::ApicTimer;
-use crate::cpu::isa::x86_64::constants::msrs;
+use crate::cpu::isa::x86_64::constants::xapic;
 use crate::cpu::multiprocessor::spin::per_lp::PerLp;
 use crate::get_lp_id;
 
-pub static LAPICS: LazyLock<PerLp<MaybeUninit<X2Apic>>> =
+pub static LAPICS: LazyLock<PerLp<MaybeUninit<Xapic>>> =
     LazyLock::new(|| PerLp::new(|| MaybeUninit::uninit()));
 
 /// # Interrupt Command Register Delivery Mode
@@ -38,36 +39,37 @@ enum IcrDestShorthand {
     _AllExcludingSelf = 0b11,
 }
 
-pub struct X2Apic {
+pub struct Xapic {
     pub timer: ApicTimer,
 }
 
-impl X2Apic {
-    /// # Initialize the local APIC in x2APIC mode
+impl Xapic {
+    /// # Initialize the local APIC in xapic mode
     /// Ref: AMD APM 16.4.7
     fn new(timer_int_vec: <ApicTimer as LpTimerIfce>::IntDispatchNum) -> Self {
         // Set the Spurious Interrupt Vector Register (SIVR)
-        const ASE_BIT_SHIFT: u64 = 8;
-        const VEC_MASK: u64 = 0xff;
-        let sivr_val = (SPURIOUS_INTERRUPT_VECTOR_NUM as u64 & VEC_MASK) | (1 << ASE_BIT_SHIFT); // APIC Software Enable
+        const ASE_BIT_SHIFT: u32 = 8;
+        const VEC_MASK: u32 = 0xff;
+        let sivr_val: u32 =
+            (SPURIOUS_INTERRUPT_VECTOR_NUM as u32 & VEC_MASK) | (1 << ASE_BIT_SHIFT); // APIC Software Enable
         unsafe {
-            msrs::write(msrs::x2apic::SPURIOUS_INTERRUPT_VECTOR_REG, sivr_val);
+            xapic_io_write32(xapic::SPURIOUS_INTERRUPT_VECTOR_REG, sivr_val);
         }
         Self::set_timer_lvt_entry(timer_int_vec, false);
-        X2Apic {
+        Xapic {
             timer: ApicTimer::new(timer_int_vec),
         }
     }
 
     pub fn record_id() {
-        id::X2APIC_ID_TABLE.lock().insert(get_lp_id(), id::LapicId::get_local());
+        id::XAPIC_ID_TABLE.lock().insert(get_lp_id(), id::LapicId::get_local());
     }
 
     fn translate_lp_id(lp_id: LpId) -> Option<id::LapicId> {
-        id::X2APIC_ID_TABLE.lock().get(&lp_id).cloned()
+        id::XAPIC_ID_TABLE.lock().get(&lp_id).cloned()
     }
 
-    pub fn physical_id(lp_id: LpId) -> Option<u32> {
+    pub fn physical_id(lp_id: LpId) -> Option<id::PhysicalLapicId> {
         Self::translate_lp_id(lp_id).map(|id| id.physical)
     }
 
@@ -97,30 +99,30 @@ impl X2Apic {
         interrupt_vector: <ApicTimer as LpTimerIfce>::IntDispatchNum,
         periodic: bool,
     ) {
-        const TIMER_MODE_SHIFT: u64 = 17;
-        const TIMER_MODE_PERIODIC: u64 = 0b1;
-        const TIMER_MODE_ONE_SHOT: u64 = 0b0;
-        const MASK_BIT_SHIFT: u64 = 16;
-        const TIMER_VECTOR_MASK: u64 = 0xff;
+        const TIMER_MODE_SHIFT: u32 = 17;
+        const TIMER_MODE_PERIODIC: u32 = 0b1;
+        const TIMER_MODE_ONE_SHOT: u32 = 0b0;
+        const MASK_BIT_SHIFT: u32 = 16;
+        const TIMER_VECTOR_MASK: u32 = 0xff;
 
-        let timer_lvt_entry = (interrupt_vector as u64 & TIMER_VECTOR_MASK)
+        let timer_lvt_entry = (interrupt_vector as u32 & TIMER_VECTOR_MASK)
             | (if periodic {
                 TIMER_MODE_PERIODIC
             } else {
                 TIMER_MODE_ONE_SHOT
             } << TIMER_MODE_SHIFT)
-                & !(1u64 << MASK_BIT_SHIFT); // Unmask the timer interrupt
+                & !(1u32 << MASK_BIT_SHIFT); // Unmask the timer interrupt
         unsafe {
-            msrs::write(msrs::x2apic::TIMER_LVTR, timer_lvt_entry);
+            xapic_io_write32(xapic::TIMER_LVTR, timer_lvt_entry);
         }
     }
 }
 
-impl LocalIntCtlrIfce for X2Apic {
+impl LocalIntCtlrIfce for Xapic {
     type Error = Error;
 
     fn init_lp() {
-        let lapic = X2Apic::new(LAPIC_TIMER_VECTOR);
+        let lapic = Xapic::new(LAPIC_TIMER_VECTOR);
         LAPICS
             .try_get_mut()
             .expect("Failed to obtain LAPIC structure during LP init.")
@@ -146,13 +148,11 @@ impl LocalIntCtlrIfce for X2Apic {
             );
             // Write to the Interrupt Command Register MSR to send the IPI
             unsafe {
-                asm!{
-                    "wrmsr",
-                    in("ecx") msrs::x2apic::INTERRUPT_COMMAND_REGISTER,
-                    in("eax") icr_low,
-                    in("edx") dest,
-                    options(nomem, nostack, preserves_flags),
-                }
+                xapic_io_write32(
+                    xapic::INTERRUPT_COMMAND_REGISTER_HIGH,
+                    (dest as u32) << id::LapicId::XAPIC_ID_SHIFT,
+                );
+                xapic_io_write32(xapic::INTERRUPT_COMMAND_REGISTER_LOW, icr_low);
             }
             // Success
             Ok(())
@@ -164,7 +164,7 @@ impl LocalIntCtlrIfce for X2Apic {
     #[unsafe(no_mangle)]
     extern "C" fn signal_eoi() {
         unsafe {
-            msrs::write(msrs::x2apic::EOI_REGISTER, 0);
+            xapic_io_write32(xapic::EOI_REGISTER, 0);
         }
     }
 }

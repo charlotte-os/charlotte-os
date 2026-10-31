@@ -39,6 +39,7 @@ pub unsafe fn write(msr: u32, value: u64) {
     }
 }
 
+pub const APIC_BASE_ADDRESS_REG: u32 = 0x1b;
 pub mod x2apic {
     //! # x2APIC MSRs
     //! Ref: AMD APM 16.11.1 and Intel SDM Vol.3 12.12.1.2

@@ -3,14 +3,14 @@
 pub mod dynamic;
 pub mod fixed;
 pub mod idt;
-pub mod x2apic;
+pub mod lapic;
 
 use idt::*;
 use spin::{LazyLock, Mutex};
 
 use crate::memory::IdTable;
 
-pub type LocalIntCtlr = x2apic::X2Apic;
+pub type LocalIntCtlr = lapic::Lapic;
 
 pub static BSP_IDT: Mutex<Idt> = Mutex::new(Idt::new());
 pub static IDT_TABLE: LazyLock<IdTable<Mutex<Idt>>> = LazyLock::new(IdTable::new);

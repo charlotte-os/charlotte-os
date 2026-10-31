@@ -103,7 +103,7 @@ impl CpuInfoIfce for CpuInfo {
                     out(reg) cr4
                 }
             }
-            if cr4 & constants::crs::CR4_LA57_ENABLE_BIT != 0 {
+            if cr4 & constants::control_regs::CR4_LA57_ENABLE_BIT != 0 {
                 57
             } else {
                 48

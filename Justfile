@@ -57,8 +57,8 @@ create-image arch="x86_64" profile="debug" features="": (build-catten arch profi
     sudo cp "./limine-binary/$bootloader" "$mount_dir/EFI/BOOT/$bootloader"
     sudo cp "./target/{{ if arch == "x86_64" { "x86_64-unknown-none-catten" } else if arch == "aarch64" { "aarch64-unknown-none-catten" } else if arch == "riscv64" { "riscv64gc-unknown-none-catten" } else { arch + "-unknown-none" } }}/{{profile}}/catten" ./limine.conf "$mount_dir"
 
-vm_memory := "512M"
-vm_num_lps := "8"
+vm_memory := "256M"
+vm_num_lps := "20"
 usb_image_path := "./test_data/disk_images/test-usb.img"
 # Padded, writable copies of the EDK2 riscv64 firmware; see qemu-run-riscv64.
 riscv_fw_dir := image_dir / "riscv64-firmware"
@@ -70,7 +70,7 @@ qemu-run-x86_64 profile="debug" features="qemu" iommu_type="amd" gdb="false": (c
     qemu-system-x86_64 \
         -enable-kvm \
         -M q35,kernel-irqchip=split \
-        -cpu host,+invtsc \
+        -cpu host,+invtsc,-x2apic \
         -smp {{vm_num_lps}} \
         -m {{vm_memory}} \
         -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/ovmf/OVMF_CODE.fd \
@@ -87,7 +87,7 @@ qemu-run-x86_64 profile="debug" features="qemu" iommu_type="amd" gdb="false": (c
         -device usb-net,netdev=usbnet0,bus=xhci.0 \
         -device usb-storage,bus=xhci.0,drive=usbdrive0 \
         -drive if=none,id=usbdrive0,format=raw,file={{usb_image_path}} \
-        {{ if iommu_type == "amd" {"-device amd-iommu,intremap=on,xtsup=on,dma-remap=on"} else {""} }} \
+        {{ if iommu_type == "amd" {"-device amd-iommu,intremap=on,xtsup=off,dma-remap=on"} else {""} }} \
         {{ if iommu_type == "intel" {"-device intel-iommu,intremap=on,eim=on,dma-translation=on"} else {""} }} \
         -chardev stdio,id=catlog,signal=on,logfile={{ log_dir }}/catten-x86_64-{{ profile }}.log.txt \
         -serial chardev:catlog \
