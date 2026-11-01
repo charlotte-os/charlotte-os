@@ -5,7 +5,7 @@ use spin::lazylock::LazyLock;
 
 use super::{INTERRUPT_STACK_SIZE, gdt};
 use crate::cpu::isa::interrupts::idt::{Idt, asm_load_idt};
-use crate::cpu::isa::interrupts::x2apic::X2Apic;
+use crate::cpu::isa::interrupts::lapic::Lapic;
 use crate::cpu::isa::lp::ops::{get_lp_id, init_lp_state};
 use crate::cpu::multiprocessor::get_lp_count;
 use crate::logln;
@@ -105,6 +105,6 @@ pub fn init_ap() {
     }
     unsafe { asm_load_idt(&raw const AP_IDTRS[ap_index]) };
     init_lp_state();
-    X2Apic::record_id();
+    Lapic::record_id();
     crate::logln!("LP {}: x86-64 logical processor initialization complete", lp_id);
 }

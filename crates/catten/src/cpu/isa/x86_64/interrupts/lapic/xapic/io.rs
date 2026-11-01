@@ -5,6 +5,7 @@ use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::memory::linear::address_map::{LA_MAP, RegionType};
 use crate::memory::{AddressSpaceInterface, KERNEL_AS, PhysicalAddress, VirtualAddress};
 
+// The same page frame and thus the same mapping are used across all processors
 pub static XAPIC_IO_BASE: LazyLock<VirtualAddress> = LazyLock::new(map_xapic_io_page);
 
 pub const APIC_BASE_ADDRESS_MASK: u64 = 0xfffff000;

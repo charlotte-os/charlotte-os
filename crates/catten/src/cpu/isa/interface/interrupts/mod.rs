@@ -30,7 +30,7 @@ pub trait LocalIntCtlrIfce {
     /// Send an inter-processor interrupt to the specified logical processor
     fn send_unicast_ipi(target_lp: LpId, target_vector: IntSrcDscr) -> Result<(), Self::Error>;
     /// Signal End of Interrupt
-    extern "C" fn signal_eoi();
+    fn signal_eoi();
 }
 
 pub trait ExternalInterruptControllerIfce {

@@ -2,6 +2,9 @@
 mod pcie;
 pub use pcie::*;
 
+use crate::cpu::isa::interface::interrupts::LocalIntCtlrIfce;
+use crate::cpu::isa::interrupts::lapic::Lapic;
+
 pub fn init_lp_state() {
     unsafe {
         core::arch::asm! {
@@ -75,18 +78,7 @@ macro_rules! unmask_interrupts {
 pub use unmask_interrupts;
 
 pub fn get_lic_id() -> u32 {
-    let apic_id: u32;
-    use crate::cpu::isa::constants::*;
-    unsafe {
-        core::arch::asm!(
-            "rdmsr",
-            inlateout("ecx") msrs::x2apic::ID_REG => _,
-            lateout("eax") apic_id,
-            lateout("edx") _,
-            options(nostack, preserves_flags)
-        );
-    }
-    apic_id
+    Lapic::get_lic_id()
 }
 
 use core::arch::{asm, naked_asm};
@@ -123,7 +115,6 @@ pub fn get_lp_id() -> LpId {
 
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::cpu::scheduler::threads::MASTER_THREAD_TABLE;
-use crate::logln;
 use crate::memory::VirtualAddress;
 
 #[inline]
@@ -278,6 +269,11 @@ pub extern "C" fn enter_init_thread_ctx(rsp0_ptr: *const u64) {
         // return to the thread's kernel entry point (which will then `iretq` to the user entry point for user threads)
         "ret",
     );
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn signal_eoi() {
+    Lapic::signal_eoi();
 }
 
 #[unsafe(no_mangle)]

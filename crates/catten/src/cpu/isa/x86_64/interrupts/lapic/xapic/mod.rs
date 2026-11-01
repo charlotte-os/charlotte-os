@@ -1,6 +1,6 @@
 //! # xAPIC Local Advanced Programmable Interrupt Controller
-mod id;
-mod io;
+pub mod id;
+pub mod io;
 
 use core::mem::MaybeUninit;
 
@@ -70,7 +70,7 @@ impl Xapic {
     }
 
     pub fn physical_id(lp_id: LpId) -> Option<id::PhysicalLapicId> {
-        Self::translate_lp_id(lp_id).map(|id| id.physical)
+        Some(Self::translate_lp_id(lp_id)?.physical)
     }
 
     fn make_icr_low(
@@ -161,8 +161,7 @@ impl LocalIntCtlrIfce for Xapic {
         }
     }
 
-    #[unsafe(no_mangle)]
-    extern "C" fn signal_eoi() {
+    fn signal_eoi() {
         unsafe {
             xapic_io_write32(xapic::EOI_REGISTER, 0);
         }

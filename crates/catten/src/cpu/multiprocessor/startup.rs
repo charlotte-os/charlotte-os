@@ -30,7 +30,10 @@ pub fn start_secondary_lps() -> Result<(), MpError> {
                 if res.flags & MP_FLAG_X2APIC as u32 != 0 {
                     logln!("Limine has set all LAPICs to x2APIC mode.")
                 } else {
-                    panic!("Processor not supported: x2APIC mode is not available.");
+                    logln!(
+                        "Limine was not able to set the LAPICs to x2APIC mode. Falling back to \
+                         xAPIC mode operation."
+                    );
                 }
             }
             _ => { /* Non-x86_64 ISAs require no special secondary processor startup handling */ }
@@ -57,9 +60,8 @@ pub unsafe fn assign_id() {
     store_lp_id(lp_id);
     if lp_id == 0 {
         early_logln!(
-            "Logical Processor with local interrupt controller ID = {} has been designated LP
+            "The bootstrap processor has been designated LP
         {}.",
-            (get_lic_id()),
             (get_lp_id())
         );
     } else {

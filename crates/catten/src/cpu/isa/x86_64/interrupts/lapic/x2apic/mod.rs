@@ -1,5 +1,5 @@
 //! # x2APIC Local Advanced Programmable Interrupt Controller
-mod id;
+pub mod id;
 
 use core::arch::asm;
 use core::mem::MaybeUninit;
@@ -161,8 +161,7 @@ impl LocalIntCtlrIfce for X2Apic {
         }
     }
 
-    #[unsafe(no_mangle)]
-    extern "C" fn signal_eoi() {
+    fn signal_eoi() {
         unsafe {
             msrs::write(msrs::x2apic::EOI_REGISTER, 0);
         }

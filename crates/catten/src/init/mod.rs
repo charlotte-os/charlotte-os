@@ -36,7 +36,7 @@ pub fn bsp_init() {
     logln!("LP 0: Intialized kernel allocator.");
     // Record the BSP's APIC ID now that the heap allocator is ready (BTreeMap requires the heap).
     #[cfg(target_arch = "x86_64")]
-    crate::cpu::isa::interrupts::x2apic::X2Apic::record_id();
+    crate::cpu::isa::interrupts::lapic::Lapic::record_id();
     // Pre-create all LP schedulers in LP ID order (0..lp_count) while single-threaded.
     // This ensures lp_schedulers[i] is always LP i's scheduler, regardless of AP init order.
     logln!("LP 0: Initializing LP local scheduler.");

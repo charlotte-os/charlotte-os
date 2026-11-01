@@ -1,5 +1,4 @@
 use alloc::sync::Arc;
-use alloc::vec;
 use alloc::vec::Vec;
 
 use spin::lazylock::LazyLock;
@@ -7,10 +6,11 @@ use spin::lazylock::LazyLock;
 use super::tsc::TSC_CYCLE_PERIOD;
 use crate::cpu::isa::constants::interrupt_vectors::LAPIC_TIMER_VECTOR;
 use crate::cpu::isa::interface::timers::{LpTimerError, LpTimerIfce};
+use crate::cpu::isa::interrupts::lapic::Lapic;
+use crate::cpu::isa::interrupts::lapic::xapic::io::{xapic_io_read32, xapic_io_write32};
 use crate::cpu::isa::lp::ops::get_lp_id;
-//use crate::cpu::isa::interrupts::x2apic::X2Apic;
 use crate::cpu::isa::timers::tsc::rdtsc;
-use crate::cpu::isa::x86_64::constants::msrs;
+use crate::cpu::isa::x86_64::constants::{msrs, xapic};
 use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
 use crate::klib::time::duration::ExtDuration;
@@ -41,13 +41,23 @@ pub struct ApicTimer {
 
 impl ApicTimer {
     pub fn set_timer_initial_count(count: u32) {
-        unsafe {
-            msrs::write(msrs::x2apic::TIMER_INITIAL_COUNT, count as u64);
+        if Lapic::is_x2apic_enabled() {
+            unsafe {
+                msrs::write(msrs::x2apic::TIMER_INITIAL_COUNT, count as u64);
+            }
+        } else {
+            unsafe {
+                xapic_io_write32(xapic::TIMER_INITIAL_COUNT, count);
+            }
         }
     }
 
     pub fn read_timer_current_count() -> u32 {
-        unsafe { msrs::read(msrs::x2apic::TIMER_CURRENT_COUNT) as u32 }
+        if Lapic::is_x2apic_enabled() {
+            unsafe { msrs::read(msrs::x2apic::TIMER_CURRENT_COUNT) as u32 }
+        } else {
+            unsafe { xapic_io_read32(xapic::TIMER_CURRENT_COUNT) }
+        }
     }
 
     fn determine_timer_resolution(&mut self) {
@@ -80,10 +90,11 @@ impl ApicTimer {
             reset_value: 0,
         };
         t.determine_timer_resolution();
-        t.set_divisor(ApicTimerDivisors::DivBy1).expect("Setting the x2APIC timer divisor failed");
+        t.set_divisor(ApicTimerDivisors::DivBy1)
+            .expect("Setting the local APIC timer divisor failed");
         t.set_isr_dispatch_number(interrupt_vector)
-            .expect("Setting the interrupt vector number for the x2APIC timer failed");
-        t.set_interrupt_mask(false).expect("Error unmasking timer interrupt in the x2APIC.");
+            .expect("Setting the interrupt vector number for the local APIC timer failed");
+        t.set_interrupt_mask(false).expect("Error unmasking timer interrupt in the local APIC.");
         t
     }
 }
@@ -100,7 +111,7 @@ impl LpTimerIfce for ApicTimer {
     type TickCount = u32;
     type Timestamp = u64;
 
-    const NAME: &'static str = "x86-64 x2APIC Timer";
+    const NAME: &'static str = "x86-64 local APIC Timer";
 
     fn get() -> Arc<Mutex<Self>> {
         APIC_TIMERS[get_lp_id() as usize]
@@ -126,8 +137,12 @@ impl LpTimerIfce for ApicTimer {
     }
 
     fn set_divisor(&mut self, divisor: Self::Divisor) -> Result<(), LpTimerError> {
-        unsafe {
-            msrs::write(msrs::x2apic::TIMER_DIVIDE_CONFIGURATION, divisor as u64);
+        if Lapic::is_x2apic_enabled() {
+            unsafe {
+                msrs::write(msrs::x2apic::TIMER_DIVIDE_CONFIGURATION, divisor as u64);
+            }
+        } else {
+            unsafe { xapic_io_write32(xapic::TIMER_DIVIDE_CONFIGURATION, divisor as u32) };
         }
         Ok(())
     }
@@ -187,28 +202,48 @@ impl LpTimerIfce for ApicTimer {
 
     fn get_interrupt_mask(&mut self) -> Result<bool, LpTimerError> {
         const MASK_BIT_SHIFT: u64 = 16;
-        let apic_timer_lvt_entry = unsafe { msrs::read(msrs::x2apic::TIMER_LVTR) };
+        let apic_timer_lvt_entry = if Lapic::is_x2apic_enabled() {
+            unsafe { msrs::read(msrs::x2apic::TIMER_LVTR) }
+        } else {
+            unsafe { xapic_io_read32(xapic::TIMER_LVTR) as u64 }
+        };
         let is_masked = (apic_timer_lvt_entry >> MASK_BIT_SHIFT) & 0b1 == 1;
         Ok(is_masked)
     }
 
     fn set_interrupt_mask(&mut self, mask: bool) -> Result<(), LpTimerError> {
         const MASK_BIT_SHIFT: u64 = 16;
-        let mut apic_timer_lvt_entry = unsafe { msrs::read(msrs::x2apic::TIMER_LVTR) };
+        let mut apic_timer_lvt_entry = if Lapic::is_x2apic_enabled() {
+            unsafe { msrs::read(msrs::x2apic::TIMER_LVTR) }
+        } else {
+            unsafe { xapic_io_read32(xapic::TIMER_LVTR) as u64 }
+        };
         if mask {
             apic_timer_lvt_entry |= 1u64 << MASK_BIT_SHIFT;
         } else {
             apic_timer_lvt_entry &= !(1u64 << MASK_BIT_SHIFT);
         }
-        unsafe { msrs::write(msrs::x2apic::TIMER_LVTR, apic_timer_lvt_entry) };
+        if Lapic::is_x2apic_enabled() {
+            unsafe { msrs::write(msrs::x2apic::TIMER_LVTR, apic_timer_lvt_entry) };
+        } else {
+            unsafe { xapic_io_write32(xapic::TIMER_LVTR, apic_timer_lvt_entry as u32) };
+        }
         Ok(())
     }
 
     fn set_isr_dispatch_number(&mut self, num: Self::IntDispatchNum) -> Result<(), LpTimerError> {
-        let mut apic_timer_lvt_entry = unsafe { msrs::read(msrs::x2apic::TIMER_LVTR) };
+        let mut apic_timer_lvt_entry = if Lapic::is_x2apic_enabled() {
+            unsafe { msrs::read(msrs::x2apic::TIMER_LVTR) }
+        } else {
+            unsafe { xapic_io_read32(xapic::TIMER_LVTR) as u64 }
+        };
         apic_timer_lvt_entry &= !0xffu64;
         apic_timer_lvt_entry |= num as u64;
-        unsafe { msrs::write(msrs::x2apic::TIMER_LVTR, apic_timer_lvt_entry) };
+        if Lapic::is_x2apic_enabled() {
+            unsafe { msrs::write(msrs::x2apic::TIMER_LVTR, apic_timer_lvt_entry) };
+        } else {
+            unsafe { xapic_io_write32(xapic::TIMER_LVTR, apic_timer_lvt_entry as u32) };
+        }
         Ok(())
     }
 }
