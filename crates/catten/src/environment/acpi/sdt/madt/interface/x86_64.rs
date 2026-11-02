@@ -153,7 +153,7 @@ pub unsafe fn enumerate_ioapics() -> HashMap<IoapicId, Mutex<IoapicDescriptor>> 
             vaddr + (unsafe { e.read_unaligned() }.ioapic_address as usize & 0xfff)
         };
         let ioapic_desc = unsafe {
-            IoapicDescriptor::new(vaddr, unsafe { e.read_unaligned() }.global_system_interrupt_base)
+            IoapicDescriptor::new(vaddr, e.read_unaligned().global_system_interrupt_base)
         };
         logln!(
             "[ACPI] Enumerated IOAPIC with ID = {:?}: {:?}",

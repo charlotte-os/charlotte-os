@@ -1,15 +1,14 @@
-//! MCFG discovery is deliberately independent of PCI device enumeration. AML can
-//! access PCI configuration while the namespace and device topology are loading.
+//! # Memory-Mapped Configuration Space (MCFG) Table
+//!
+//! This module provides functionality to parse the ACPI MCFG table, which describes
+//! the memory-mapped configuration space (ECAM) for PCI Express segment groups.
 use alloc::vec::Vec;
 use core::ptr::read_unaligned;
 
 use spin::LazyLock;
 
 use crate::cpu::isa::interface::memory::address::Address;
-use crate::device_management::drivers::busses::pci_express::topology::{
-    PcieSegmentGroup,
-    PcieSegmentGroupInfo,
-};
+use crate::device_management::drivers::busses::pci_express::topology::PcieSegmentGroupInfo;
 use crate::environment::acpi::table_map::{AcpiTableHeader, AcpiTableType, TABLE_MAP};
 use crate::logln;
 use crate::memory::PhysicalAddress;

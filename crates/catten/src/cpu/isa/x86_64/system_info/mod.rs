@@ -138,7 +138,7 @@ impl CpuInfoIfce for CpuInfo {
                 (cpuid_result.ecx & 1 << 22) != 0
             }
             IsaExtension::TscDeadline => {
-                let cpuid_result = __cpuid_count(0x0000_0007, 0);
+                let cpuid_result = __cpuid_count(0x0000_0001, 0);
                 (cpuid_result.ecx & 1 << 24) != 0
             }
         }

@@ -1,3 +1,5 @@
+//! # Fixed ACPI Description Table (FADT)
+
 use super::*;
 use crate::environment::acpi::table_map::AcpiTableHeader;
 use crate::memory::PhysicalAddress;
