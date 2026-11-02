@@ -264,7 +264,7 @@ unsafe fn get_tss() -> *mut Tss {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn update_tss_rsp0(val: u64) {
+pub unsafe extern "C" fn update_tss_rsp0(val: u64) {
     unsafe {
         let tss = get_tss();
         (*tss).rsp0 = val;

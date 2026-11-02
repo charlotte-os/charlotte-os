@@ -12,7 +12,7 @@ pub fn init_lp_state() {
             "mov rax, cr4",
             "or rax, 1<<16", // Set the bit to enable FSGSBASE instructions
             "mov cr4, rax",
-            "rdmsr", // Read the kernel assigned processor ID from the TSC_AUX register into edx:eax (since it's actually only 32 bits later we only use eax to read it)
+            "rdmsr", // Read the kernel assigned processor ID from the TSC_AUX register into edx:eax (since it's actually only 32 bits later we read only eax)
             "wrfsbase eax",
             "wrgsbase eax",
             in("ecx") TSC_AUX,
@@ -226,34 +226,6 @@ pub extern "C" fn switch_ctx(curr_rsp0_ptr: *mut u64, next_rsp0_ptr: *const u64)
         "push rax",
         "popfq",
         // return to the next thread
-        "ret",
-    );
-}
-
-#[unsafe(no_mangle)]
-#[unsafe(naked)]
-pub extern "C" fn enter_init_thread_ctx(rsp0_ptr: *const u64) {
-    naked_asm!(
-                // load the stack pointer from the next thread context
-        "mov rsp, [rsi]",
-        // restore caller-saved registers
-        "pop rax",
-        "mov cr3, rax",
-        "popfq",
-        "xor r15, r15",
-        "xor r14, r14",
-        "xor r13, r13",
-        "xor r12, r12",
-        "xor r11, r11",
-        "xor r10, r10",
-        "xor r9, r9",
-        "xor r8, r8",
-        "xor rbp, rbp",
-        "xor rdx, rdx",
-        "xor rcx, rcx",
-        "xor rbx, rbx",
-        "xor rax, rax",     
-        // return to the thread's kernel entry point (which will then `iretq` to the user entry point for user threads)
         "ret",
     );
 }
