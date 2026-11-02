@@ -2,6 +2,7 @@
 mod pcie;
 pub use pcie::*;
 
+use crate::cpu::isa::constants::msrs::TSC_AUX;
 use crate::cpu::isa::interface::interrupts::LocalIntCtlrIfce;
 use crate::cpu::isa::interrupts::lapic::Lapic;
 
@@ -11,12 +12,12 @@ pub fn init_lp_state() {
             "mov rax, cr4",
             "or rax, 1<<16", // Set the bit to enable FSGSBASE instructions
             "mov cr4, rax",
-            "rdtscp", // Read the kernel assigned processor ID from the TSC_AUX register
-            "wrfsbase rcx",
-            "wrgsbase rcx",
+            "rdmsr", // Read the kernel assigned processor ID from the TSC_AUX register into edx:eax (since it's actually only 32 bits later we only use eax to read it)
+            "wrfsbase eax",
+            "wrgsbase eax",
+            in("ecx") TSC_AUX,
             out("rax") _,
-            out("rcx") _,
-            out("rdx") _,
+            lateout("edx") _,
         }
     }
 }
@@ -77,6 +78,7 @@ macro_rules! unmask_interrupts {
 #[rustfmt::skip]
 pub use unmask_interrupts;
 
+#[inline(always)]
 pub fn get_lic_id() -> u32 {
     Lapic::get_lic_id()
 }
@@ -86,31 +88,16 @@ use core::arch::{asm, naked_asm};
 use super::LpId;
 use crate::cpu::isa::constants::*;
 
+#[inline(always)]
 pub fn store_lp_id(id: LpId) {
-    let id_upper = ((id as u64) >> 32) as u32;
-    let id_lower = ((id as u64) & (1 << 32) - 1) as u32;
     unsafe {
-        asm!(
-            "wrmsr",
-            in("eax") id_lower,
-            in("edx") id_upper,
-            in("ecx") msrs::TSC_AUX,
-            options(nostack, preserves_flags)
-        );
+        msrs::write(TSC_AUX, id as u64);
     }
 }
 
+#[inline(always)]
 pub fn get_lp_id() -> LpId {
-    let mut id: u32;
-    unsafe {
-        core::arch::asm!(
-            "rdtscp",
-            out("edx") _,
-            out("eax") _,
-            out("ecx") id,
-        );
-    }
-    id as crate::cpu::isa::lp::LpId
+    unsafe { msrs::read(TSC_AUX) as LpId }
 }
 
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
