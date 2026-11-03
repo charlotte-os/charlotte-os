@@ -7,7 +7,6 @@ use crate::klib::observer::{Observable as _, Observer};
 use crate::klib::time::duration::ExtDuration;
 use crate::logln;
 use crate::memory::AddressSpaceId;
-use crate::timers::{TIMER_QUEUES, TimerEvent};
 
 pub mod lp_schedulers;
 pub mod sync;
@@ -62,10 +61,15 @@ pub fn yield_lp() {
 /// program's runtime library, however upcalls are still solely the purview of the kernel and we
 /// should at least attempt delivery prior to abort.
 pub fn abort() -> ! {
-    if let Some(tid) = SYSTEM_SCHEDULER.read().get_lp_scheduler().lock().get_tid() {
+    let sys_sched_lk = SYSTEM_SCHEDULER.read();
+    // `abort_thread` locks this LP's scheduler again, so the guard must be gone by then.
+    let tid = sys_sched_lk.get_lp_scheduler().lock().get_tid();
+    if let Some(tid) = tid {
         logln!("Thread {} is aborting execution.", tid);
-        SYSTEM_SCHEDULER.read().abort_thread(tid).expect("Error aborting thread");
+        sys_sched_lk.abort_thread(tid).expect("Error aborting thread");
     }
+    // This function never returns, so nothing would drop the guard otherwise.
+    drop(sys_sched_lk);
     yield_lp();
     unsafe { unreachable_unchecked() }
 }

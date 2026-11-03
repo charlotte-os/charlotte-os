@@ -7,7 +7,7 @@ subsystem and AML interpreter Catten drives its firmware interface with.
 
 | Path            | Contents                                                             |
 | --------------- | -------------------------------------------------------------------- |
-| `vendor/uacpi`  | Upstream uACPI **6.1.0**, vendored verbatim (MIT)                     |
+| `vendor/uacpi`  | Upstream uACPI **7.0.0**, vendored verbatim (MIT)                     |
 | `include.h`     | The translation unit bindgen parses to find uACPI's public surface    |
 | `build.rs`      | Compiles the C sources with clang and runs bindgen over `include.h`   |
 | `src/lib.rs`    | `no_std` shim that includes the generated bindings                    |
@@ -19,7 +19,7 @@ headers are written in terms of the `uacpi_*` scalar typedefs it declares.
 ## The host half of the interface
 
 uACPI is only half a library. Every declaration in `uacpi/kernel_api.h` is a function *the kernel
-owes uACPI* — 46 of them at this version — and this crate supplies none of them. Anything that
+owes uACPI* — 43 of them at this version — and this crate supplies none of them. Anything that
 links it has to define them all with `#[unsafe(no_mangle)]` or the link fails with one undefined
 reference per missing function. In this workspace that is
 `catten::environment::acpi::aml::uacpi_host`. The host implementation and its scheduler,

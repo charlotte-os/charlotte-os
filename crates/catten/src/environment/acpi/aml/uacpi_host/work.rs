@@ -1,77 +1,95 @@
 //! Allocation-free interrupt-side submission to persistent kernel worker threads.
+//!
+//! uACPI creates a work item for every piece of deferred work ahead of time, so the
+//! queues are intrusive lists threaded through those items: scheduling never
+//! allocates and cannot fail, which uACPI requires since it returns nothing.
 
+use core::ptr::null_mut;
 use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use uacpi_wrapper::*;
 
-use super::sync::Event;
+use super::c_alloc::{allocate_object, free_object};
 use crate::cpu::multiprocessor::interrupt_tracking::get_interrupt_depth;
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
+use crate::cpu::scheduler::sync::semaphore::Semaphore;
 use crate::cpu::scheduler::{spawn_thread_on_lp, yield_lp};
 use crate::memory::KERNEL_ASID;
-
-const QUEUE_CAPACITY: usize = 256;
 
 #[derive(Clone, Copy)]
 struct Work {
     handler: unsafe extern "C" fn(uacpi_handle),
-    context: usize,
+    context: uacpi_handle,
 }
 
-struct Queue {
-    items: [Option<Work>; QUEUE_CAPACITY],
-    head: usize,
-    len: usize,
+struct WorkItem {
+    next: *mut WorkItem,
+    work: Option<Work>,
 }
+
+/// FIFO of pending work items, linked through `WorkItem::next`.
+struct Queue {
+    head: *mut WorkItem,
+    tail: *mut WorkItem,
+}
+
+// The items are only ever reached through the queue's lock while pending.
+unsafe impl Send for Queue {}
 
 impl Queue {
     const fn new() -> Self {
         Self {
-            items: [None; QUEUE_CAPACITY],
-            head: 0,
-            len: 0,
+            head: null_mut(),
+            tail: null_mut(),
         }
     }
 
-    fn push(&mut self, work: Work) -> bool {
-        if self.len == QUEUE_CAPACITY {
-            return false;
+    /// `item` must be live and not already pending.
+    unsafe fn push(&mut self, item: *mut WorkItem, work: Work) {
+        unsafe {
+            (*item).next = null_mut();
+            (*item).work = Some(work);
+            match self.tail.as_mut() {
+                Some(tail) => tail.next = item,
+                None => self.head = item,
+            }
         }
-        self.items[(self.head + self.len) % QUEUE_CAPACITY] = Some(work);
-        self.len += 1;
-        true
+        self.tail = item;
     }
 
+    /// Detaches the oldest item and takes its work out of it. uACPI may reuse
+    /// or free the item as soon as the handler runs, so it is never touched
+    /// again after this returns.
     fn pop(&mut self) -> Option<Work> {
-        if self.len == 0 {
-            return None;
+        let item = unsafe { self.head.as_mut() }?;
+        self.head = item.next;
+        if self.head.is_null() {
+            self.tail = null_mut();
         }
-        let item = self.items[self.head].take();
-        self.head = (self.head + 1) % QUEUE_CAPACITY;
-        self.len -= 1;
-        item
+        item.next = null_mut();
+        item.work.take()
     }
 }
 
 struct Worker {
     queue: Mutex<Queue>,
-    available: Event,
+    available: Semaphore,
 }
 
 impl Worker {
     const fn new() -> Self {
         Self {
             queue: Mutex::new(Queue::new()),
-            available: Event::new(),
+            available: Semaphore::new(0),
         }
     }
 
     fn run(&self) -> ! {
         loop {
-            self.available.wait(u16::MAX);
+            self.available.wait(None);
             let work = self.queue.lock().pop();
             if let Some(work) = work {
-                unsafe { (work.handler)(work.context as uacpi_handle) };
+                unsafe { (work.handler)(work.context) };
                 OUTSTANDING.fetch_sub(1, Ordering::Release);
             }
         }
@@ -101,34 +119,52 @@ pub(super) fn initialize() {
 }
 
 #[unsafe(no_mangle)]
+pub unsafe extern "C" fn uacpi_kernel_create_work_item() -> uacpi_handle {
+    allocate_object(WorkItem {
+        next: null_mut(),
+        work: None,
+    })
+    .cast()
+}
+
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn uacpi_kernel_free_work_item(handle: uacpi_handle) {
+    unsafe { free_object(handle.cast::<WorkItem>()) };
+}
+
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn uacpi_kernel_schedule_work(
     work_type: uacpi_work_type,
+    work_item: uacpi_handle,
     handler: uacpi_work_handler,
     context: uacpi_handle,
-) -> uacpi_status {
+) {
+    let item = work_item.cast::<WorkItem>();
+    // uACPI never passes either as null, and there is no status to report it with.
     let Some(handler) = handler else {
-        return UACPI_STATUS_INVALID_ARGUMENT;
+        return;
     };
+    if item.is_null() {
+        return;
+    }
     let worker = match work_type {
         UACPI_WORK_GPE_EXECUTION => &GPE_WORKER,
-        UACPI_WORK_NOTIFICATION => &NOTIFY_WORKER,
-        _ => return UACPI_STATUS_INVALID_ARGUMENT,
+        _ => &NOTIFY_WORKER,
     };
-    if !INITIALIZED.load(Ordering::Acquire) {
-        return UACPI_STATUS_INIT_LEVEL_MISMATCH;
-    }
     {
         let mut queue = worker.queue.lock();
-        if !queue.push(Work {
-            handler,
-            context: context as usize,
-        }) {
-            return UACPI_STATUS_OUT_OF_MEMORY;
-        }
+        unsafe {
+            queue.push(
+                item,
+                Work {
+                    handler,
+                    context,
+                },
+            )
+        };
         OUTSTANDING.fetch_add(1, Ordering::Release);
     }
     worker.available.signal();
-    UACPI_STATUS_OK
 }
 
 #[unsafe(no_mangle)]
@@ -137,6 +173,8 @@ pub unsafe extern "C" fn uacpi_kernel_wait_for_work_completion() -> uacpi_status
         return UACPI_STATUS_INVALID_ARGUMENT;
     }
     super::interrupts::wait_for_interrupts();
+    // Work scheduled by a handler is counted before that handler's own work is
+    // retired, so this also waits for everything the drained work schedules.
     while OUTSTANDING.load(Ordering::Acquire) != 0 {
         yield_lp();
     }

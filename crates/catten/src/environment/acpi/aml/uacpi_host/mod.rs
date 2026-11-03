@@ -1,4 +1,4 @@
-//! Kernel services for the vendored uACPI 6.1 host ABI.
+//! Kernel services for the vendored uACPI 7.0 host ABI.
 //!
 //! The wrapper uses the full interpreter with preformatted logging, unsized frees,
 //! and uACPI's built-in MMIO/zeroed-allocation helpers. Keep these exports in sync

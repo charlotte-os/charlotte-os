@@ -60,6 +60,6 @@ pub fn initialize_acpi() -> Result<(), InitError> {
     }
     READY.store(true, Ordering::Release);
     #[cfg(feature = "acpi_self_test")]
-    uacpi_host::self_test::run();
+    super::uacpi_host::self_test::run();
     Ok(())
 }

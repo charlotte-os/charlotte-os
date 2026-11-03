@@ -129,7 +129,8 @@ impl SystemScheduler {
     }
 
     pub fn abort_thread(&self, tid: ThreadId) -> Result<ThreadId, Error> {
-        if let Ok(thread) = MASTER_THREAD_TABLE.write().get_mut(tid) {
+        let mut mtt_lk = MASTER_THREAD_TABLE.write();
+        if let Ok(thread) = mtt_lk.get_mut(tid) {
             match thread.state {
                 ThreadState::Running(lp_id) | ThreadState::Ready(lp_id) => {
                     self.lp_schedulers[&lp_id]
@@ -139,10 +140,7 @@ impl SystemScheduler {
                 }
                 _ => {}
             }
-            MASTER_THREAD_TABLE
-                .write()
-                .remove_element(tid)
-                .expect(&format!("Failed to delete thread {tid}"));
+            mtt_lk.remove_element(tid).expect(&format!("Failed to delete thread {tid}"));
             Ok(tid)
         } else {
             Err(Error::InvalidThread)

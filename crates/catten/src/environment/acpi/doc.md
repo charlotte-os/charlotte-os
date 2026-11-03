@@ -47,17 +47,19 @@ initializes uACPI, loads and initializes the namespace, selects the interrupt mo
 GPE initialization. Only then is the namespace published as ready and peripheral discovery begun.
 The early, hand-written SDT readers still supply MADT and MCFG data without depending on AML.
 
-Host mutexes and counting events use scheduler waits with atomic registration against signals and
-timer deadlines. A wakeup resumes the saved context on the same processor. Millisecond sleeps
+uACPI builds both its locks and its events on one host counting semaphore, which uses scheduler
+waits with atomic registration against signals and timer deadlines. It has no owner, and giving a
+unit back never sleeps, so it is safe with interrupts masked or a spinlock held. A wakeup resumes the saved context on the same processor. Millisecond sleeps
 actually relinquish the CPU, microsecond stalls busy-wait, and time reporting retains sub-second
 precision. Interrupt flags are restored to their prior state even for nested operations.
 
 On x86-64, the SCI is delivered through the IOAPIC using MADT overrides and ACPI's low/level defaults.
 Dynamic IDT gates save registers and maintain interrupt depth. Uninstall masks the source, removes
 the callback, and waits for active invocations before freeing its context. Deferred GPE and notify
-callbacks have separate bounded queues (256 entries each), execute in thread context on LP 0, and
-report queue exhaustion. Work completion waits for interrupt callbacks first, then queued and
-executing work. Call it from ordinary thread context, never from a worker waiting for itself.
+callbacks have separate queues, threaded through the work items uACPI allocates ahead of time, so
+scheduling from an interrupt never allocates or fails. They execute in thread context on LP 0, and
+a work item is never touched once its handler starts, leaving uACPI free to reuse or free it. Work completion waits for interrupt callbacks first, then queued and
+executing work, including any work that work schedules in turn. Call it from ordinary thread context, never from a worker waiting for itself.
 
 PCI access requires MCFG ECAM independently of device enumeration. Functions outside the
 firmware ECAM allocations return NOT_FOUND; there is no legacy configuration-port fallback.
@@ -92,7 +94,8 @@ current four-level paging implementation. Serial transcripts go to `logs/uacpi-s
 
 The `acpi_self_test` feature checks allocation/alignment failures, mapping offsets and overflow,
 PCI offsets and bounds, overlapping SystemIO views, interrupt-flag nesting, timer precision,
-counting events and timeouts, mutex contention across CPUs, worker affinity, work draining, and
+semaphores as locks and events with timeouts, lock contention across CPUs, worker affinity,
+work-item reuse, draining of chained work, and
 namespace evaluation. The script then injects two power-button interrupts and checks that both
 reach uACPI and wake a deferred worker after the system has become idle. The power-button handler
 is a test fixture enabled only by this feature.

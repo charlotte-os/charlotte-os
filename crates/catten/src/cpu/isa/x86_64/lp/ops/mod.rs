@@ -135,45 +135,7 @@ pub extern "C" fn cond_yield_lp() {
     loop {
         // No scheduler/table guard may survive a switch or the idle instruction.
         let mut idle = false;
-        let switch_params = {
-            let sched = SYSTEM_SCHEDULER.read();
-            let mut local = sched.get_lp_scheduler().lock();
-            if !local.is_ctx_switch_pending() {
-                None
-            } else {
-                let current = local.get_tid();
-                match local.next() {
-                    Ok(next) => {
-                        local.clear_ctx_switch_pending();
-                        if current == Some(next) {
-                            None
-                        } else {
-                            let mut threads = MASTER_THREAD_TABLE.write();
-                            let saved_stack = current.map_or(core::ptr::null_mut(), |tid| {
-                                &raw mut threads
-                                    .get_mut(tid)
-                                    .unwrap()
-                                    .context
-                                    .kernel_stack_buf
-                                    .curr_sp
-                            });
-                            let next_stack = &raw const threads
-                                .get(next)
-                                .unwrap()
-                                .context
-                                .kernel_stack_buf
-                                .curr_sp;
-                            Some((saved_stack, next_stack))
-                        }
-                    }
-                    Err(_) => {
-                        local.stop();
-                        idle = true;
-                        None
-                    }
-                }
-            }
-        };
+        let switch_params = get_ctx_switch_params(&mut idle);
         if let Some((current, next)) = switch_params {
             switch_ctx(current.cast::<u64>(), next.cast::<u64>());
         }
@@ -188,6 +150,37 @@ pub extern "C" fn cond_yield_lp() {
     }
     if interrupts_were_enabled {
         unmask_interrupts!();
+    }
+}
+
+fn get_ctx_switch_params(idle: &mut bool) -> Option<(*mut VirtualAddress, *const VirtualAddress)> {
+    let sched = SYSTEM_SCHEDULER.read();
+    let mut local = sched.get_lp_scheduler().lock();
+    if !local.is_ctx_switch_pending() {
+        None
+    } else {
+        let current = local.get_tid();
+        match local.next() {
+            Ok(next) => {
+                local.clear_ctx_switch_pending();
+                if current == Some(next) {
+                    None
+                } else {
+                    let mut threads = MASTER_THREAD_TABLE.write();
+                    let saved_stack = current.map_or(core::ptr::null_mut(), |tid| {
+                        &raw mut threads.get_mut(tid).unwrap().context.kernel_stack_buf.curr_sp
+                    });
+                    let next_stack =
+                        &raw const threads.get(next).unwrap().context.kernel_stack_buf.curr_sp;
+                    Some((saved_stack, next_stack))
+                }
+            }
+            Err(_) => {
+                local.stop();
+                *idle = true;
+                None
+            }
+        }
     }
 }
 
