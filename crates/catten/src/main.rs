@@ -178,7 +178,7 @@ extern "C" fn ps2_kb_status_print(
         );
         return uacpi_wrapper::UACPI_ITERATION_DECISION_NEXT_PEER;
     } else {
-        logln!("Successfully retrieved PS/2 keyboard resources.");
+        logln!("Successfully retrieved PS/2 keyboard resources from ACPI.");
     }
     uacpi_wrapper::UACPI_ITERATION_DECISION_CONTINUE
 }

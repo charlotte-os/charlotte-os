@@ -129,6 +129,6 @@ impl TimerQueue {
     }
 
     fn get_next_deadline(&self) -> Option<Timestamp> {
-        self.events.front().map(|event| event.deadline)
+        Some(self.events.front()?.deadline)
     }
 }
