@@ -76,7 +76,7 @@ pub extern "C" fn bsp_main() -> ! {
         assign_id();
     }
     early_logln!("BSP assigned ID 0.");
-    init::bsp_init();
+    init::stage0::bsp_init();
     logln!("System initialized.");
     logln!("Starting secondary LPs...");
     start_secondary_lps().expect("Failed to start secondary LPs");
@@ -122,7 +122,7 @@ pub unsafe extern "C" fn ap_main(_cpuinfo: &MpInfo) -> ! {
     unsafe {
         assign_id();
     }
-    init::ap_init();
+    init::stage0::ap_init();
     INIT_BARRIER.wait();
     let lp_id = get_lp_id();
     logln!("LP {lp_id}: Bootstrapping complete.");
@@ -136,71 +136,4 @@ pub unsafe extern "C" fn ap_main(_cpuinfo: &MpInfo) -> ! {
     yield_lp();
     /* We've switched into thread context and never come back */
     unsafe { unreachable_unchecked() }
-}
-
-#[cfg(target_arch = "x86_64")]
-#[unsafe(no_mangle)]
-pub extern "C" fn print_ioapic_info() {
-    logln!("LP {}: Printing IOAPIC information...", (get_lp_id()));
-    let ioapic_list = IOAPIC_LIST.read();
-    ioapic_list.iter().for_each(|(id, desc)| {
-        logln!("Enumerated IOAPIC with ID = {:?}: {:?}", id, (desc.lock()));
-    });
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn test_fn() {
-    let thread_id = SYSTEM_SCHEDULER.read().get_lp_scheduler().lock().get_tid().unwrap();
-    let lp_id = get_lp_id();
-    loop {
-        logln!("Logging from thread {thread_id} on LP {lp_id}!");
-    }
-}
-
-#[unsafe(no_mangle)]
-#[cfg(feature = "acpi")]
-extern "C" fn ps2_kb_status_print(
-    _: *mut core::ffi::c_void,
-    node: *mut uacpi_wrapper::uacpi_namespace_node,
-    _: u32,
-) -> uacpi_wrapper::uacpi_iteration_decision {
-    let mut kb_res: *mut uacpi_wrapper::uacpi_resources = core::ptr::null_mut();
-
-    let ret = unsafe { uacpi_get_current_resources(node, &mut kb_res) };
-    if core::hint::unlikely(ret != UACPI_STATUS_OK) {
-        logln!(
-            "unable to retrieve PS/2 keyboard resources: {}",
-            (unsafe {
-                CStr::from_ptr(uacpi_wrapper::uacpi_status_to_string(ret))
-                    .to_str()
-                    .unwrap_or("<invalid UTF-8>")
-            })
-        );
-        return uacpi_wrapper::UACPI_ITERATION_DECISION_NEXT_PEER;
-    } else {
-        logln!("Successfully retrieved PS/2 keyboard resources from ACPI.");
-    }
-    uacpi_wrapper::UACPI_ITERATION_DECISION_CONTINUE
-}
-
-/// Firmware initialization precedes discovery so drivers can safely evaluate AML.
-extern "C" fn initialize_platform() {
-    #[cfg(target_arch = "x86_64")]
-    print_ioapic_info();
-    #[cfg(feature = "acpi")]
-    {
-        crate::environment::acpi::aml::init::initialize_acpi()
-            .unwrap_or_else(|error| panic!("ACPI initialization failed: {error}"));
-        logln!("LP {}: ACPI initialization complete.", (get_lp_id()));
-        unsafe {
-            uacpi_wrapper::uacpi_find_devices(
-                c"PNP0303".as_ptr(),
-                Some(ps2_kb_status_print),
-                core::ptr::null_mut(),
-            );
-        }
-    }
-    logln!("{}", (*PCIE_TOPOLOGY));
-    logln!("Platform initialization complete.");
-    abort();
 }
