@@ -1,6 +1,8 @@
 use alloc::sync::Weak;
 use core::hint::unreachable_unchecked;
 
+use hashbrown::HashSet;
+
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::cpu::scheduler::threads::{MASTER_THREAD_TABLE, Thread, ThreadId};
 use crate::klib::observer::{Observable as _, Observer};
@@ -31,8 +33,7 @@ pub fn spawn_thread_on_lp(
     entry_point: extern "C" fn(),
     lp_id: crate::cpu::isa::lp::LpId,
 ) -> ThreadId {
-    let mut thread = Thread::new(asid, entry_point);
-    thread.affinity = Some(lp_id);
+    let thread = Thread::new_pinned(asid, entry_point, HashSet::from([lp_id]));
     let tid = MASTER_THREAD_TABLE.write().add_element(thread);
     SYSTEM_SCHEDULER.read().submit_ready_thread(tid).expect("Error submitting pinned thread");
     tid

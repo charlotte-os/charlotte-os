@@ -4,6 +4,8 @@ use alloc::format;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 
+use hashbrown::HashSet;
+
 use super::lp_schedulers::LpScheduler;
 use crate::cpu::isa::constants::interrupt_vectors::LAPIC_TIMER_VECTOR;
 use crate::cpu::isa::interface::interrupts::LocalIntCtlrIfce;
@@ -23,6 +25,7 @@ pub enum Error {
     InvalidThread,
     AlreadyBlocked,
     ThreadTerminated,
+    EmptyAllowedLpSet,
 }
 
 /// The system-wide thread scheduler
@@ -50,11 +53,14 @@ impl SystemScheduler {
     }
 
     pub fn submit_ready_thread(&self, tid: ThreadId) -> Result<LpId, Error> {
-        let affinity =
-            MASTER_THREAD_TABLE.read().get(tid).map_err(|_| Error::InvalidThread)?.affinity;
-        let target = match affinity {
-            Some(lp) => self.lp_schedulers.get(&lp).ok_or(Error::InvalidThread)?,
-            None => self.get_least_loaded_lp(),
+        // `add_thread` write-locks the thread table, so the read guard must be gone by then.
+        let target = {
+            let mtt_rdlk = MASTER_THREAD_TABLE.read();
+            let thread = mtt_rdlk.get(tid).map_err(|_| Error::InvalidThread)?;
+            match &thread.allowed_lps {
+                Some(allowed_lps) => self.get_least_loaded_allowed_lp(allowed_lps)?,
+                None => self.get_least_loaded_lp(),
+            }
         };
         let mut scheduler = target.lock();
         let was_idle = scheduler.is_idle();
@@ -140,7 +146,7 @@ impl SystemScheduler {
                 }
                 _ => {}
             }
-            mtt_lk.remove_element(tid).expect(&format!("Failed to delete thread {tid}"));
+            mtt_lk.get_mut(tid).map_err(|_| Error::InvalidThread)?.exit();
             Ok(tid)
         } else {
             Err(Error::InvalidThread)
@@ -162,7 +168,27 @@ impl SystemScheduler {
     }
 
     fn get_least_loaded_lp(&self) -> &Mutex<Box<dyn LpScheduler>> {
-        self.lp_schedulers.iter().min_by_key(|sched| sched.1.lock().thread_count()).unwrap().1
+        let lp_id = self.lp_load_order()[0];
+        &self.lp_schedulers[&lp_id]
+    }
+
+    fn get_least_loaded_allowed_lp(
+        &self,
+        allowed_lps: &HashSet<LpId>,
+    ) -> Result<&Mutex<Box<dyn LpScheduler>>, Error> {
+        for lp_id in self.lp_load_order() {
+            if allowed_lps.contains(&lp_id) {
+                return Ok(&self.lp_schedulers[&lp_id]);
+            }
+        }
+        Err(Error::EmptyAllowedLpSet)
+    }
+
+    /// Returns the logical processors sorted by their current load in ascending order
+    fn lp_load_order(&self) -> Box<[LpId]> {
+        let mut lps: Vec<LpId> = self.lp_schedulers.keys().copied().collect();
+        lps.sort_by_key(|lp_id| self.lp_schedulers[lp_id].lock().thread_count());
+        lps.into_boxed_slice()
     }
 }
 

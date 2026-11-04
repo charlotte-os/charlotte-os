@@ -4,6 +4,7 @@ use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use core::mem::offset_of;
 
+use hashbrown::HashSet;
 use spin::LazyLock;
 
 use crate::cpu::isa::lp::LpId;
@@ -27,6 +28,7 @@ pub enum ThreadState {
     Ready(LpId),
     NeedsLpAssignment,
     Blocked(Arc<Waker>),
+    Exited,
 }
 
 #[derive(Debug)]
@@ -34,8 +36,7 @@ pub struct Thread {
     pub context: ThreadContext,
     pub asid: AddressSpaceId,
     pub state: ThreadState,
-    /// A pinned thread must keep its processor after every wakeup.
-    pub affinity: Option<LpId>,
+    pub allowed_lps: Option<HashSet<LpId>>,
     exit_observers: spin::Mutex<Vec<Weak<dyn Observer>>>,
 }
 
@@ -53,13 +54,32 @@ impl Thread {
             },
             asid,
             state: ThreadState::NeedsLpAssignment,
-            affinity: None,
+            allowed_lps: None,
             exit_observers: spin::Mutex::new(Vec::new()),
         }
     }
 
+    pub fn new_pinned(
+        asid: AddressSpaceId,
+        entry_point: extern "C" fn(),
+        allowed_lps: HashSet<LpId>,
+    ) -> Self {
+        let mut thread = Thread::new(asid, entry_point);
+        thread.allowed_lps = Some(allowed_lps);
+        thread
+    }
+
     pub fn is_user_thread(&self) -> bool {
         self.asid != KERNEL_ASID
+    }
+
+    pub fn exit(&mut self) {
+        self.state = ThreadState::Exited;
+        for observer in self.exit_observers.lock().iter() {
+            if let Some(observer) = observer.upgrade() {
+                observer.notify();
+            }
+        }
     }
 }
 
@@ -73,15 +93,5 @@ impl Thread {
 impl Observable for Thread {
     fn register_observer(&self, observer: Weak<dyn Observer>) {
         self.exit_observers.lock().push(observer);
-    }
-}
-
-impl Drop for Thread {
-    fn drop(&mut self) {
-        for observer in self.exit_observers.lock().iter() {
-            if let Some(observer) = observer.upgrade() {
-                observer.notify();
-            }
-        }
     }
 }
