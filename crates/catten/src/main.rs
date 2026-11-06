@@ -93,11 +93,7 @@ pub extern "C" fn bsp_main() -> ! {
             environment::acpi::table_map::print_table_map();
         }
     }
-    mask_interrupts!();
-    let thread_id = spawn_thread_on_lp(KERNEL_ASID, initialize_platform, 0);
-    logln!("Platform initialization thread spawned with ID = {thread_id}.");
-    unmask_interrupts!();
-    logln!("Submitted all initial kernel threads.");
+    init::stage1::create_initial_threads();
     logln!(
         "LP {}: Bootstrapping complete. Yielding the processor to the scheduler.",
         (get_lp_id())
