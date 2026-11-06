@@ -45,7 +45,7 @@ pub fn initialize_acpi() -> Result<(), InitError> {
             status: UACPI_STATUS_ALREADY_EXISTS,
         });
     }
-    super::uacpi_host::initialize();
+    crate::environment::acpi::aml::uacpi_host::initialize();
     unsafe {
         check("subsystem initialization", uacpi_initialize(0))?;
         check("namespace load", uacpi_namespace_load())?;

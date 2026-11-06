@@ -18,12 +18,14 @@ extern "C" fn initialize_platform() {
     print_ioapic_info();
     #[cfg(feature = "acpi")]
     {
-        crate::environment::acpi::aml::init::initialize_acpi()
+        crate::environment::acpi::aml::ospm::init::initialize_acpi()
             .unwrap_or_else(|error| panic!("ACPI initialization failed: {error}"));
         logln!("LP {}: ACPI initialization complete.", (get_lp_id()));
         unsafe {
+            use crate::environment::acpi::aml::ospm::pnp_ids;
+
             uacpi_wrapper::uacpi_find_devices(
-                c"PNP0303".as_ptr(),
+                pnp_ids::PS2_KEYBOARD.as_ptr(),
                 Some(ps2_kb_status_print),
                 core::ptr::null_mut(),
             );
