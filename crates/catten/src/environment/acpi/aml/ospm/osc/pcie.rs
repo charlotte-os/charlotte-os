@@ -50,3 +50,7 @@ extern "C" fn negotiate_osc(
 ) -> uacpi_wrapper::uacpi_iteration_decision {
     todo!("Implement PCI Express OSC negotiation");
 }
+
+fn invoke_pcie_osc(node: *mut uacpi_wrapper::uacpi_namespace_node) -> uacpi_wrapper::uacpi_status {
+    todo!()
+}
