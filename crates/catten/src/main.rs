@@ -33,13 +33,9 @@ pub mod power_management;
 pub mod self_test;
 pub mod timers;
 
-use alloc::string::ToString;
-use core::ffi::CStr;
 use core::hint::unreachable_unchecked;
 
 use limine::mp::MpInfo;
-use spin::{Barrier, LazyLock};
-use uacpi_wrapper::{UACPI_STATUS_OK, uacpi_get_current_resources};
 
 use crate::cpu::isa::interface::interrupts::LocalIntCtlrIfce;
 use crate::cpu::isa::interface::system_info::CpuInfoIfce;
@@ -47,18 +43,10 @@ use crate::cpu::isa::interrupts::LocalIntCtlr;
 use crate::cpu::isa::lp::ops::get_lp_id;
 use crate::cpu::isa::system_info::CpuInfo;
 use crate::cpu::isa::timers::print_timer_info;
-use crate::cpu::multiprocessor::get_lp_count;
 use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
-use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
-use crate::cpu::scheduler::{abort, spawn_thread_on_lp, yield_lp};
-use crate::device_management::drivers::busses::pci_express::topology::PCIE_TOPOLOGY;
-#[cfg(target_arch = "x86_64")]
-use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::IOAPIC_LIST;
-use crate::memory::KERNEL_ASID;
+use crate::cpu::scheduler::yield_lp;
 
 const KERNEL_VERSION: (u64, u64, u64) = (0, 10, 0);
-static INIT_BARRIER: LazyLock<Barrier> = LazyLock::new(|| Barrier::new(get_lp_count() as usize));
-static YIELD_BARRIER: LazyLock<Barrier> = LazyLock::new(|| Barrier::new(get_lp_count() as usize));
 /// This is the bootstrap processor's entry point into the kernel. The `bsp_main` function is
 /// called by the bootloader after setting up the environment. It is made C ABI compatible so
 /// that it can be called by Limine or any other Limine Boot Protocol compliant bootloader.
@@ -80,7 +68,6 @@ pub extern "C" fn bsp_main() -> ! {
     logln!("System initialized.");
     logln!("Starting secondary LPs...");
     start_secondary_lps().expect("Failed to start secondary LPs");
-    INIT_BARRIER.wait();
     self_test::run_self_tests();
     logln!("System Information:");
     logln!("CPU Vendor: {}", (CpuInfo::get_vendor()));
@@ -98,7 +85,6 @@ pub extern "C" fn bsp_main() -> ! {
         "LP {}: Bootstrapping complete. Yielding the processor to the scheduler.",
         (get_lp_id())
     );
-    YIELD_BARRIER.wait();
     LocalIntCtlr::init_lp();
     logln!(
         "LP {}: Initialized local interrupt controller. Yielding the processor to the scheduler.",
@@ -119,10 +105,8 @@ pub unsafe extern "C" fn ap_main(_cpuinfo: &MpInfo) -> ! {
         assign_id();
     }
     init::stage0::ap_init();
-    INIT_BARRIER.wait();
     let lp_id = get_lp_id();
     logln!("LP {lp_id}: Bootstrapping complete.");
-    YIELD_BARRIER.wait();
     logln!("LP {lp_id}: Starting local interrupt controller initialization.");
     LocalIntCtlr::init_lp();
     logln!(
