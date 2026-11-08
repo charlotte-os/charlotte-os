@@ -1,3 +1,5 @@
+use alloc::string::String;
+use alloc::vec::Vec;
 use core::ffi::{c_char, c_void};
 use core::ptr;
 
@@ -161,10 +163,11 @@ unsafe extern "C" fn on_host_bridge(
     match result {
         Ok(granted) => {
             logln!(
-                "[ACPI][OSPM] Successfully negotiated _OSC for host bridge with segment group \
-                 {:?}. Granted features: 0b{:b}",
+                "[ACPI][OSPM] Successfully negotiated _OSC for the PCIe host bridge for segment \
+                 group number {:?}. Granted features: 0b{:b}\r\n{}",
                 seg_group,
-                granted
+                granted,
+                result_to_string(granted)
             );
             PCIE_OSC_RESULTS.write().insert(seg_group, granted);
         }
@@ -187,6 +190,26 @@ unsafe extern "C" fn on_host_bridge(
     }
 
     UACPI_ITERATION_DECISION_CONTINUE
+}
+
+fn result_to_string(result: u32) -> String {
+    let mut features = Vec::new();
+    if result & support::EXT_CONFIG != 0 {
+        features.push("\tExtended Configuration Space (EXT_CONFIG)");
+    }
+    if result & support::ASPM != 0 {
+        features.push("\tActive State Power Management (ASPM)");
+    }
+    if result & support::CLOCK_PM != 0 {
+        features.push("\tClock Power Management (CLOCK_PM)");
+    }
+    if result & support::SEGMENT_GROUPS != 0 {
+        features.push("\tMultiple Segment Groups (SEGMENT_GROUPS)");
+    }
+    if result & support::MSI != 0 {
+        features.push("\tMessage Signaled Interrupts (MSI)");
+    }
+    features.join("\r\n")
 }
 
 pub fn negotiate_pci_osc() {
