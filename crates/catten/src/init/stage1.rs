@@ -1,6 +1,7 @@
 use crate::cpu::isa::lp::ops::{get_lp_id, mask_interrupts, unmask_interrupts};
 use crate::cpu::scheduler::{abort, spawn_thread};
 use crate::device_management::drivers::busses::pci_express::topology::PCIE_TOPOLOGY;
+use crate::environment::acpi::aml::ospm::osc::pcie::negotiate_pci_osc;
 use crate::logln;
 use crate::memory::KERNEL_ASID;
 
@@ -32,6 +33,7 @@ extern "C" fn initialize_platform() {
         }
     }
     logln!("{}", (*PCIE_TOPOLOGY));
+    negotiate_pci_osc();
     logln!("Platform initialization complete.");
     abort();
 }
