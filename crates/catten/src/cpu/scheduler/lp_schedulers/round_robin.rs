@@ -7,7 +7,7 @@ use hashbrown::HashMap;
 use crate::cpu::isa::lp::LpId;
 use crate::cpu::isa::memory::paging::HwAsid;
 use crate::cpu::scheduler::lp_schedulers::{Error, LpScheduler};
-use crate::cpu::scheduler::threads::{MASTER_THREAD_TABLE, ThreadCount, ThreadId, ThreadState};
+use crate::cpu::scheduler::threads::{THREAD_DIRECTORY, ThreadCount, ThreadId, ThreadState};
 use crate::klib::observer::{Observable, Observer};
 use crate::klib::time::duration::ExtDuration;
 use crate::memory::AddressSpaceId;
@@ -17,7 +17,7 @@ use crate::timers::{TIMER_QUEUES, TimerEvent};
 struct ThreadHandle(ThreadId);
 impl PartialOrd for ThreadHandle {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        let tt_guard = MASTER_THREAD_TABLE.read();
+        let tt_guard = THREAD_DIRECTORY.read();
         let self_as = unsafe { tt_guard.get(self.0).as_ref().unwrap_unchecked().asid };
         let other_as = unsafe { tt_guard.get(other.0).as_ref().unwrap_unchecked().asid };
         // Sort first by AddressSpaceId then by ThreadId
@@ -92,7 +92,7 @@ impl LpScheduler for RoundRobin {
     }
 
     fn next(&mut self) -> Result<ThreadId, Error> {
-        let mut threads = MASTER_THREAD_TABLE.write();
+        let mut threads = THREAD_DIRECTORY.write();
         let previous = self.current_handle;
         let previous_is_runnable = previous.is_some_and(|handle| {
             threads
@@ -120,7 +120,7 @@ impl LpScheduler for RoundRobin {
 
     fn add_thread(&mut self, tid: ThreadId) -> Result<(), Error> {
         let thread_already_assigned = {
-            let tt_guard = MASTER_THREAD_TABLE.read();
+            let tt_guard = THREAD_DIRECTORY.read();
             matches!(
                 tt_guard.get(tid).as_ref().unwrap().state,
                 ThreadState::Running(_) | ThreadState::Ready(_)
@@ -132,7 +132,7 @@ impl LpScheduler for RoundRobin {
         } else {
             let new_handle = ThreadHandle(tid);
             self.run_queue.push_back(new_handle);
-            MASTER_THREAD_TABLE.write().get_mut(tid).as_mut().unwrap().state =
+            THREAD_DIRECTORY.write().get_mut(tid).as_mut().unwrap().state =
                 ThreadState::Ready(self.lp_id);
             Ok(())
         }

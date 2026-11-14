@@ -14,7 +14,7 @@ use crate::cpu::isa::lp::LpId;
 use crate::cpu::isa::lp::ops::get_lp_id;
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
 use crate::cpu::multiprocessor::spin::rwlock::RwLock;
-use crate::cpu::scheduler::threads::{MASTER_THREAD_TABLE, ThreadId, ThreadState, waker};
+use crate::cpu::scheduler::threads::{THREAD_DIRECTORY, ThreadId, ThreadState, waker};
 use crate::logln;
 use crate::memory::AddressSpaceId;
 
@@ -55,7 +55,7 @@ impl SystemScheduler {
     pub fn submit_ready_thread(&self, tid: ThreadId) -> Result<LpId, Error> {
         // `add_thread` write-locks the thread table, so the read guard must be gone by then.
         let target = {
-            let mtt_rdlk = MASTER_THREAD_TABLE.read();
+            let mtt_rdlk = THREAD_DIRECTORY.read();
             let thread = mtt_rdlk.get(tid).map_err(|_| Error::InvalidThread)?;
             match &thread.allowed_lps {
                 Some(allowed_lps) => self.get_least_loaded_allowed_lp(allowed_lps)?,
@@ -83,7 +83,7 @@ impl SystemScheduler {
         if scheduler.get_tid() != Some(tid) {
             return Err(Error::InvalidThread);
         }
-        let mut threads = MASTER_THREAD_TABLE.write();
+        let mut threads = THREAD_DIRECTORY.write();
         let thread = threads.get_mut(tid).map_err(|_| Error::InvalidThread)?;
         if !matches!(thread.state, ThreadState::Running(_)) {
             return Err(Error::AlreadyBlocked);
@@ -98,7 +98,7 @@ impl SystemScheduler {
     /// context. A remote processor must not run a stack that is still executing.
     pub fn wake_thread(&self, wake: &Arc<waker::Waker>) {
         let mut scheduler = self.lp_schedulers[&wake.lp_id].lock();
-        let mut threads = MASTER_THREAD_TABLE.write();
+        let mut threads = THREAD_DIRECTORY.write();
         let Ok(thread) = threads.get_mut(wake.thread_id) else {
             return;
         };
@@ -135,7 +135,7 @@ impl SystemScheduler {
     }
 
     pub fn abort_thread(&self, tid: ThreadId) -> Result<ThreadId, Error> {
-        let mut mtt_lk = MASTER_THREAD_TABLE.write();
+        let mut mtt_lk = THREAD_DIRECTORY.write();
         if let Ok(thread) = mtt_lk.get_mut(tid) {
             match thread.state {
                 ThreadState::Running(lp_id) | ThreadState::Ready(lp_id) => {
@@ -146,7 +146,7 @@ impl SystemScheduler {
                 }
                 _ => {}
             }
-            mtt_lk.get_mut(tid).map_err(|_| Error::InvalidThread)?.exit();
+            mtt_lk.get_mut(tid).map_err(|_| Error::InvalidThread)?.mark_exited();
             Ok(tid)
         } else {
             Err(Error::InvalidThread)
@@ -155,7 +155,7 @@ impl SystemScheduler {
 
     pub fn abort_as_threads(&self, asid: AddressSpaceId) {
         let mut threads_to_abort = Vec::new();
-        for (id, thread) in MASTER_THREAD_TABLE.read().iter().enumerate() {
+        for (id, thread) in THREAD_DIRECTORY.read().iter().enumerate() {
             if let Some(thread) = thread {
                 if thread.asid == asid {
                     threads_to_abort.push(id);

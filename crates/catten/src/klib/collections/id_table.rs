@@ -22,7 +22,7 @@ impl<'a, T> IdTable<T> {
         }
     }
 
-    pub fn add_element(&mut self, element: T) -> usize {
+    pub fn insert(&mut self, element: T) -> usize {
         logln!("Adding element to ID Table.");
         if let Some(id) = self.available_ids.pop() {
             logln!("ID Table: Available ID found: {id}.");
@@ -46,7 +46,7 @@ impl<'a, T> IdTable<T> {
         self.list.get_mut(element_id).ok_or(Error::IdNotActive)?.as_mut().ok_or(Error::IdNotActive)
     }
 
-    pub fn remove_element(&mut self, element_id: usize) -> Result<(), Error> {
+    pub fn remove(&mut self, element_id: usize) -> Result<(), Error> {
         let element = self.list.get_mut(element_id).ok_or(Error::IdNotActive)?;
         if element.is_none() {
             return Err(Error::IdNotActive);

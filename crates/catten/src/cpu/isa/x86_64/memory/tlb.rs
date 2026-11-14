@@ -1,5 +1,7 @@
 use core::arch::asm;
 
+use talc::base;
+
 use crate::cpu::isa::memory::paging::PAGE_SIZE;
 use crate::memory::VirtualAddress;
 
@@ -15,4 +17,8 @@ pub fn inval_range(base: VirtualAddress, num_pages: usize) {
             );
         }
     }
+}
+
+pub fn tlb_shootdown_global(base: VirtualAddress, num_pages: usize) {
+    inval_range(base, num_pages);
 }

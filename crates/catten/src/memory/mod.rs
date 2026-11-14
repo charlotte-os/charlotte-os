@@ -14,7 +14,7 @@ pub use crate::cpu::isa::memory::paging::AddressSpace;
 pub use crate::cpu::multiprocessor::spin::mutex::Mutex;
 pub use crate::cpu::multiprocessor::spin::rwlock::RwLock;
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
-use crate::cpu::scheduler::threads::MASTER_THREAD_TABLE;
+use crate::cpu::scheduler::threads::THREAD_DIRECTORY;
 use crate::environment::boot_protocol::limine::{HHDM_REQUEST, MEMORY_MAP_REQUEST};
 pub use crate::klib::collections::id_table::IdTable;
 
@@ -55,7 +55,7 @@ pub static PHYSICAL_FRAME_ALLOCATOR: LazyLock<Mutex<PhysicalFrameAllocator>> =
 
 pub fn get_current_asid() -> AddressSpaceId {
     if let Some(tid) = SYSTEM_SCHEDULER.read().get_lp_scheduler().lock().get_tid() {
-        MASTER_THREAD_TABLE.read().get(tid).unwrap().asid
+        THREAD_DIRECTORY.read().get(tid).unwrap().asid
     } else {
         KERNEL_ASID
     }

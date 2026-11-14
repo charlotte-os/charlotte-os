@@ -82,6 +82,7 @@ impl IpiRpc {
             }
             IpiRpc::Wakeup => {
                 SYSTEM_SCHEDULER.read().get_lp_scheduler().lock().set_ctx_switch_pending();
+                // The actual attempt to switch happens on the interrupt exit path
             }
         }
     }

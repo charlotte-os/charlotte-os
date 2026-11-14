@@ -101,7 +101,7 @@ pub fn get_lp_id() -> LpId {
 }
 
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
-use crate::cpu::scheduler::threads::MASTER_THREAD_TABLE;
+use crate::cpu::scheduler::threads::THREAD_DIRECTORY;
 use crate::memory::VirtualAddress;
 
 #[inline]
@@ -166,7 +166,7 @@ fn get_ctx_switch_params(idle: &mut bool) -> Option<(*mut VirtualAddress, *const
                 if current == Some(next) {
                     None
                 } else {
-                    let mut threads = MASTER_THREAD_TABLE.write();
+                    let mut threads = THREAD_DIRECTORY.write();
                     let saved_stack = current.map_or(core::ptr::null_mut(), |tid| {
                         &raw mut threads.get_mut(tid).unwrap().context.kernel_stack_buf.curr_sp
                     });

@@ -1,3 +1,4 @@
+pub mod reaper;
 pub mod waker;
 
 use alloc::sync::{Arc, Weak};
@@ -15,7 +16,7 @@ use crate::klib::collections::id_table::IdTable;
 use crate::klib::observer::{Observable, Observer};
 use crate::memory::{AddressSpaceId, KERNEL_ASID};
 
-pub static MASTER_THREAD_TABLE: LazyLock<RwLock<ThreadTable>> =
+pub static THREAD_DIRECTORY: LazyLock<RwLock<ThreadTable>> =
     LazyLock::new(|| RwLock::new(ThreadTable::new()));
 pub type ThreadTable = IdTable<Thread>;
 pub type ThreadId = usize;
@@ -73,7 +74,7 @@ impl Thread {
         self.asid != KERNEL_ASID
     }
 
-    pub fn exit(&mut self) {
+    pub fn mark_exited(&mut self) {
         self.state = ThreadState::Exited;
         for observer in self.exit_observers.lock().iter() {
             if let Some(observer) = observer.upgrade() {

@@ -4,7 +4,7 @@ use core::hint::unreachable_unchecked;
 use hashbrown::HashSet;
 
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
-use crate::cpu::scheduler::threads::{MASTER_THREAD_TABLE, Thread, ThreadId};
+use crate::cpu::scheduler::threads::{THREAD_DIRECTORY, Thread, ThreadId};
 use crate::klib::observer::{Observable as _, Observer};
 use crate::klib::time::duration::ExtDuration;
 use crate::logln;
@@ -19,7 +19,7 @@ pub mod threads;
 /// and then execution.
 pub fn spawn_thread(asid: AddressSpaceId, entry_point: extern "C" fn()) -> ThreadId {
     let thread = Thread::new(asid, entry_point);
-    let tid = MASTER_THREAD_TABLE.write().add_element(thread);
+    let tid = THREAD_DIRECTORY.write().insert(thread);
     SYSTEM_SCHEDULER
         .read()
         .submit_ready_thread(tid as ThreadId)
@@ -34,7 +34,7 @@ pub fn spawn_thread_on_lp(
     lp_id: crate::cpu::isa::lp::LpId,
 ) -> ThreadId {
     let thread = Thread::new_pinned(asid, entry_point, HashSet::from([lp_id]));
-    let tid = MASTER_THREAD_TABLE.write().add_element(thread);
+    let tid = THREAD_DIRECTORY.write().insert(thread);
     SYSTEM_SCHEDULER.read().submit_ready_thread(tid).expect("Error submitting pinned thread");
     tid
 }
@@ -89,7 +89,7 @@ pub fn observe_thread_exit(
     thread_id: ThreadId,
     observer: Weak<dyn Observer>,
 ) -> Result<(), system_scheduler::Error> {
-    if let Ok(thread) = MASTER_THREAD_TABLE.read().get(thread_id) {
+    if let Ok(thread) = THREAD_DIRECTORY.read().get(thread_id) {
         thread.register_observer(observer);
         Ok(())
     } else {
