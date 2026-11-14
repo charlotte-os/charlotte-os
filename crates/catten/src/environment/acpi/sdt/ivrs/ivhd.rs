@@ -1,6 +1,7 @@
 use crate::klib::bitwise;
 use crate::memory::PhysicalAddress;
 
+#[repr(transparent)]
 pub(super) struct FlagsLegacy(u8);
 
 impl FlagsLegacy {
@@ -33,6 +34,7 @@ impl IommuInfo {
     }
 }
 
+#[repr(transparent)]
 pub(super) struct IommuFeatureReporting(u32);
 
 impl IommuFeatureReporting {
@@ -113,6 +115,7 @@ impl IommuFeatureReporting {
 }
 
 /// The legacy IVHD structure(Type 10h)
+#[repr(C)]
 pub(super) struct IvhdLegacy {
     _ivhd_type: u8,
     pub flags: FlagsLegacy,
@@ -125,6 +128,7 @@ pub(super) struct IvhdLegacy {
     pub iommu_feature_reporting: IommuFeatureReporting,
 }
 
+#[repr(transparent)]
 pub struct FlagsModern(u32);
 
 impl FlagsModern {
@@ -134,16 +138,17 @@ impl FlagsModern {
     }
 }
 
+#[repr(transparent)]
 pub struct IommuAttributes(u32);
 
 impl IommuAttributes {
     fn num_perf_counters_per_bank(&self) -> u8 {
-        const NUM_PERF_COUNTER_PER_BANK_MASK: u32 = 0b1111;
-        const NUM_PERF_COUNTER_PER_BANK_SHIFT: u8 = 13;
+        const NUM_PERF_COUNTERS_PER_BANK_MASK: u32 = 0b1111;
+        const NUM_PERF_COUNTERS_PER_BANK_SHIFT: u8 = 13;
         bitwise::read_subfield(
             self.0,
-            NUM_PERF_COUNTER_PER_BANK_SHIFT,
-            NUM_PERF_COUNTER_PER_BANK_MASK,
+            NUM_PERF_COUNTERS_PER_BANK_SHIFT,
+            NUM_PERF_COUNTERS_PER_BANK_MASK,
         ) as u8
     }
 
@@ -168,6 +173,7 @@ impl IommuAttributes {
 }
 
 /// The modern IVHD structure(Type 11h/40h)
+#[repr(C)]
 pub(super) struct IvhdModern {
     pub ivhd_type: u8,
     pub flags: FlagsModern,
