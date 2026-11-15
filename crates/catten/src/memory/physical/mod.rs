@@ -12,9 +12,9 @@ use crate::cpu::isa::interface::memory::address::Address;
 pub use crate::cpu::isa::interface::memory::address::PhysicalAddressIfce;
 pub use crate::cpu::isa::memory::MemoryInterfaceImpl;
 pub use crate::cpu::isa::memory::address::paddr::{PhysicalAddress, PhysicalAddressError};
-use crate::early_logln;
 use crate::klib::constants::BITS_PER_BYTE;
 use crate::klib::size::kibibytes;
+use crate::log::early_logln;
 use crate::memory::allocators::memory::PageSize;
 
 /// Page frames are 4 KiB in size on all supported architectures.

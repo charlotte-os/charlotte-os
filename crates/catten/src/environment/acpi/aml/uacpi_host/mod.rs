@@ -19,7 +19,7 @@ use core::ffi::{CStr, c_char};
 use uacpi_wrapper::*;
 
 use crate::environment::acpi::table_map::is_acpi_available;
-use crate::logln;
+use crate::log::logln;
 use crate::memory::PhysicalAddress;
 
 /// Prepare the deferred executor before uACPI installs any event handlers.

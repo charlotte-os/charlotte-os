@@ -8,9 +8,9 @@ use crate::cpu::isa::lp::ops::get_lp_id;
 use crate::cpu::scheduler::lp_schedulers::round_robin::RoundRobin;
 use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::klib::time::duration::ExtDuration;
+use crate::log::{early_logln, logln};
 use crate::memory::PHYSICAL_FRAME_ALLOCATOR;
 use crate::memory::allocators::global_allocator::init_primary_allocator;
-use crate::{early_logln, logln};
 
 pub fn bsp_init() {
     early_logln!("LP 0: Performing ISA specific initialization...");

@@ -8,7 +8,7 @@ use crate::cpu::isa::interrupts::idt::{Idt, asm_load_idt};
 use crate::cpu::isa::interrupts::lapic::Lapic;
 use crate::cpu::isa::lp::ops::{get_lp_id, init_lp_state};
 use crate::cpu::multiprocessor::get_lp_count;
-use crate::logln;
+use crate::log::logln;
 
 static AP_INTERRUPT_STACKS: LazyLock<Vec<[u8; INTERRUPT_STACK_SIZE]>> = LazyLock::new(|| {
     logln!("LP {}: Computing the number of AP interrupt stacks to allocate.", (get_lp_id()));

@@ -15,7 +15,7 @@ use crate::environment::acpi::sdt::GlobalSystemInterrupt;
 use crate::environment::acpi::sdt::madt::entries::interrupt_source_override::InterruptSourceOverrideEntry;
 use crate::environment::acpi::sdt::madt::entries::ioapic::IoApicEntry;
 use crate::environment::acpi::sdt::madt::entries::{MADT_INDEX, MadtEntryType, interrupt_flags};
-use crate::logln;
+use crate::log::logln;
 use crate::memory::allocators::memory::PageSize;
 use crate::memory::linear::address_map::RegionType::KernelMmio;
 use crate::memory::linear::address_map::{LA_MAP, LinearMemoryRegion};

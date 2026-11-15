@@ -64,26 +64,6 @@ pub struct IvrsHeader {
     _reserved: u64,
 }
 
-impl IvrsHeader {
-    fn try_get_ivdbs_ptr(&self) -> Result<IvdbPtr, Error> {
-        let first_ivdb_type_ptr =
-            unsafe { (&raw const *self).byte_add(self.length as usize) } as *const u8;
-        match unsafe { *first_ivdb_type_ptr } {
-            0x10 => Ok(IvdbPtr::Ivhd10H(first_ivdb_type_ptr as *const ivhd::Ivhd10H)),
-            0x11 => Ok(IvdbPtr::Ivhd11H(first_ivdb_type_ptr as *const ivhd::Ivhd11H)),
-            0x40 => Ok(IvdbPtr::Ivhd40H(first_ivdb_type_ptr as *const ivhd::Ivhd40H)),
-            0x20..=0x22 => Ok(IvdbPtr::Ivmd(first_ivdb_type_ptr as *const ivmd::Ivmd)),
-            _ => Err(Error::InvalidIvdbType),
-        }
-    }
-}
-
-enum IvdbPtr {
-    IvhdLegacy(*const ivhd::IvhdLegacy),
-    IvhdModern(*const ivhd::IvhdModern),
-    Ivmd(*const ivmd::Ivmd),
-}
-
 #[repr(u8)]
 pub(super) enum EntryType {
     // 4-byte entries

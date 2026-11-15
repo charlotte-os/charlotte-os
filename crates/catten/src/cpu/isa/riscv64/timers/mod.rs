@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 
 use crate::cpu::isa::interface::timers::{ExtDuration, LpTimerError, LpTimerIfce};
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
-use crate::logln;
+use crate::log::logln;
 
 pub struct SupervisorTimer;
 

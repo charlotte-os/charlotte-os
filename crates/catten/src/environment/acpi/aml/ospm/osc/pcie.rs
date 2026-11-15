@@ -9,7 +9,7 @@ use uacpi_wrapper::*;
 
 use crate::cpu::scheduler::sync::rwlock::RwLock;
 use crate::device_management::drivers::busses::pci_express::topology::PcieSegmentGroupNum;
-use crate::logln;
+use crate::log::logln;
 
 pub static PCIE_OSC_RESULTS: LazyLock<RwLock<HashMap<PcieSegmentGroupNum, u32>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));

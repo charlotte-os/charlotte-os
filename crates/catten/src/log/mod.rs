@@ -23,7 +23,6 @@
 //! Only the finished bytes are written to the sinks under a lock, and that lock records which LP
 //! holds it so that an exception or NMI handler interrupting the holder can still log without
 //! waiting on its own LP.
-
 mod chars;
 pub mod early;
 #[cfg(feature = "display")]
@@ -220,33 +219,33 @@ pub fn write_log(args: fmt::Arguments, sinks: Sinks, newline: bool) {
 /// Logs to the early console only, without a trailing line break.
 ///
 /// Valid at any point after control passes from the bootloader, including before the heap exists.
-#[macro_export]
 macro_rules! early_log {
     ($($arg:tt)*) => {
         $crate::log::write_log(format_args!($($arg)*), $crate::log::Sinks::EarlyConsole, false)
     };
 }
+pub(crate) use early_log;
 
 /// Logs a line to the early console only.
 ///
 /// Valid at any point after control passes from the bootloader, including before the heap exists.
 /// See [`logln!`] on why the line break is written by hand.
-#[macro_export]
 macro_rules! early_logln {
     ($($arg:tt)*) => {
         $crate::log::write_log(format_args!($($arg)*), $crate::log::Sinks::EarlyConsole, true)
     };
 }
+pub(crate) use early_logln;
 
 /// Logs to every sink, without a trailing line break.
 ///
 /// Requires the heap.
-#[macro_export]
 macro_rules! log {
     ($($arg:tt)*) => {
         $crate::log::write_log(format_args!($($arg)*), $crate::log::Sinks::All, false)
     };
 }
+pub(crate) use log;
 
 /// Logs a line to every sink, terminated by a carriage return and a line feed.
 ///
@@ -257,9 +256,9 @@ macro_rules! log {
 /// at each break itself.
 ///
 /// Requires the heap.
-#[macro_export]
 macro_rules! logln {
     ($($arg:tt)*) => {
         $crate::log::write_log(format_args!($($arg)*), $crate::log::Sinks::All, true)
     };
 }
+pub(crate) use logln;

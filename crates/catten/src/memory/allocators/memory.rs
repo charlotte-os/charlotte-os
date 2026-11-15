@@ -1,6 +1,6 @@
 use crate::cpu::isa::interface::memory::AddressSpaceInterface;
 use crate::cpu::multiprocessor::spin::mutex::MutexCore;
-use crate::logln;
+use crate::log::logln;
 use crate::memory::linear::{MemoryMapping, PageType, VirtualAddress};
 use crate::memory::physical::{self, *};
 use crate::memory::{AddressSpace, KERNEL_AS, PHYSICAL_FRAME_ALLOCATOR};

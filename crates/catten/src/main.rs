@@ -45,6 +45,7 @@ use crate::cpu::isa::system_info::CpuInfo;
 use crate::cpu::isa::timers::print_timer_info;
 use crate::cpu::multiprocessor::startup::{assign_id, start_secondary_lps};
 use crate::cpu::scheduler::yield_lp;
+use crate::log::{early_logln, logln};
 
 const KERNEL_VERSION: (u64, u64, u64) = (0, 10, 0);
 /// This is the bootstrap processor's entry point into the kernel. The `bsp_main` function is

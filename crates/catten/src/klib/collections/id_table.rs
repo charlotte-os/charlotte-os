@@ -1,7 +1,7 @@
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-use crate::logln;
+use crate::log::logln;
 
 #[derive(Debug)]
 pub enum Error {

@@ -189,7 +189,7 @@ pub(super) struct IvhdModern {
 }
 
 impl IvhdModern {
-    pub fn get_first_device_entry_ptr(&self) -> *const c_void {
-        unsafe { (&raw const *self).byte_add(size_of::<IvhdModern>()) }
+    pub fn get_first_device_entry_ptr(&self) -> *const u8 {
+        unsafe { (&raw const *self as *const u8).byte_add(size_of::<IvhdModern>()) }
     }
 }

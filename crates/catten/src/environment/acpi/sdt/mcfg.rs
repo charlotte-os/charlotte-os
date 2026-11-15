@@ -10,7 +10,7 @@ use spin::LazyLock;
 use crate::cpu::isa::interface::memory::address::Address;
 use crate::device_management::drivers::busses::pci_express::topology::PcieSegmentGroupInfo;
 use crate::environment::acpi::table_map::{AcpiTableHeader, AcpiTableType, TABLE_MAP};
-use crate::logln;
+use crate::log::logln;
 use crate::memory::PhysicalAddress;
 use crate::memory::physical::PhysicalAddressIfce;
 

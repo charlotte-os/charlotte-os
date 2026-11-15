@@ -8,7 +8,7 @@ use spin::LazyLock;
 
 use crate::cpu::isa::interface::memory::address::Address;
 use crate::environment::boot_protocol::limine::RSDP_REQUEST;
-use crate::logln;
+use crate::log::logln;
 use crate::memory::PhysicalAddress;
 use crate::memory::physical::PhysicalAddressIfce;
 

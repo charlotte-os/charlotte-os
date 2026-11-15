@@ -9,7 +9,7 @@ use super::address::vaddr::VirtualAddress;
 use crate::cpu::isa::interface::memory::address::{Address, VirtualAddressIfce};
 use crate::cpu::isa::interface::memory::{AddressSpaceInterface, MemoryInterface, MemoryMapping};
 use crate::klib::size::{gibibytes, kibibytes, mebibytes};
-use crate::logln;
+use crate::log::logln;
 use crate::memory::linear::PageType;
 use crate::memory::{PHYSICAL_FRAME_ALLOCATOR, PhysicalAddress};
 

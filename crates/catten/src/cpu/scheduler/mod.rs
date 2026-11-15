@@ -7,7 +7,7 @@ use crate::cpu::scheduler::system_scheduler::SYSTEM_SCHEDULER;
 use crate::cpu::scheduler::threads::{THREAD_DIRECTORY, Thread, ThreadId};
 use crate::klib::observer::{Observable as _, Observer};
 use crate::klib::time::duration::ExtDuration;
-use crate::logln;
+use crate::log::logln;
 use crate::memory::AddressSpaceId;
 
 pub mod lp_schedulers;

@@ -1,5 +1,5 @@
 use crate::cpu::isa::interface::memory::address::PhysicalAddressIfce;
-use crate::logln;
+use crate::log::logln;
 use crate::memory::PHYSICAL_FRAME_ALLOCATOR;
 
 pub fn test_pmem() {

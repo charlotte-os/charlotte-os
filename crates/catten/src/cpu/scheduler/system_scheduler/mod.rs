@@ -15,7 +15,7 @@ use crate::cpu::isa::lp::ops::get_lp_id;
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
 use crate::cpu::multiprocessor::spin::rwlock::RwLock;
 use crate::cpu::scheduler::threads::{THREAD_DIRECTORY, ThreadId, ThreadState, waker};
-use crate::logln;
+use crate::log::logln;
 use crate::memory::AddressSpaceId;
 
 pub static SYSTEM_SCHEDULER: RwLock<SystemScheduler> = RwLock::new(SystemScheduler::new());

@@ -6,7 +6,7 @@ use uacpi_wrapper::*;
 
 use crate::cpu::isa::lp::ops::{get_int_state, get_lp_id};
 use crate::cpu::multiprocessor::interrupt_tracking::get_interrupt_depth;
-use crate::logln;
+use crate::log::logln;
 
 static COMPLETED: AtomicUsize = AtomicUsize::new(0);
 static CHAINED: AtomicUsize = AtomicUsize::new(0);

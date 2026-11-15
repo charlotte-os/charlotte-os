@@ -7,7 +7,7 @@
 
 pub mod memory;
 
-use crate::logln;
+use crate::log::logln;
 
 pub fn run_self_tests() {
     logln!("Running self tests...");

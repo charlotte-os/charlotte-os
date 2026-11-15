@@ -1,7 +1,7 @@
 use alloc::alloc::{alloc, dealloc};
 use core::alloc::Layout;
 
-use crate::logln;
+use crate::log::logln;
 
 pub fn test_allocator() {
     logln!("Starting the kernel allocator self-test...");

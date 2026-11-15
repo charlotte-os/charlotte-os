@@ -1,6 +1,6 @@
 use crate::cpu::isa::init::gdt;
 use crate::cpu::isa::interrupts::idt::Idt;
-use crate::logln;
+use crate::log::logln;
 use crate::memory::VirtualAddress;
 
 pub fn set_gates(idt: &mut Idt) {
