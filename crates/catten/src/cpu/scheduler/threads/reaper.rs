@@ -1,6 +1,15 @@
 use alloc::vec::Vec;
 
-pub fn reap_exited_threads() {
+use crate::klib::time::duration::ExtDuration;
+
+pub extern "C" fn run_reaper() {
+    loop {
+        crate::cpu::scheduler::sleep(ExtDuration::from_secs(600));
+        reap_exited_threads();
+    }
+}
+
+fn reap_exited_threads() {
     let mut thread_table = crate::cpu::scheduler::threads::THREAD_DIRECTORY.write();
     let mut rm_list = Vec::new();
     for (idx, elem) in thread_table.iter().enumerate() {
@@ -11,6 +20,7 @@ pub fn reap_exited_threads() {
         }
     }
     for idx in rm_list {
-        thread_table.remove(idx);
+        crate::log::logln!("[Reaper] Dropping thread with ID = {idx}.");
+        let _ = thread_table.remove(idx);
     }
 }

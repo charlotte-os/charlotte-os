@@ -1,13 +1,17 @@
 use crate::cpu::isa::lp::ops::{get_lp_id, mask_interrupts, unmask_interrupts};
+use crate::cpu::scheduler::threads::reaper::run_reaper;
 use crate::cpu::scheduler::{abort, spawn_thread};
 use crate::device_management::drivers::busses::pci_express::topology::PCIE_TOPOLOGY;
 use crate::environment::acpi::aml::ospm::osc::pcie::negotiate_pci_osc;
-use crate::logln;
+use crate::log::logln;
 use crate::memory::KERNEL_ASID;
 
 pub fn create_initial_threads() {
     mask_interrupts!();
-    let thread_id = spawn_thread(KERNEL_ASID, initialize_platform);
+    let mut thread_id;
+    thread_id = spawn_thread(KERNEL_ASID, run_reaper);
+    logln!("Reaper thread spawned with ID = {thread_id}.");
+    thread_id = spawn_thread(KERNEL_ASID, initialize_platform);
     logln!("Platform initialization thread spawned with ID = {thread_id}.");
     unmask_interrupts!();
     logln!("Submitted all initial kernel threads.");
