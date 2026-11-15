@@ -4,7 +4,7 @@ use crate::klib::time::duration::ExtDuration;
 
 pub extern "C" fn run_reaper() {
     loop {
-        crate::cpu::scheduler::sleep(ExtDuration::from_secs(600));
+        crate::cpu::scheduler::sleep(ExtDuration::from_secs(60));
         reap_exited_threads();
     }
 }
@@ -20,7 +20,7 @@ fn reap_exited_threads() {
         }
     }
     for idx in rm_list {
-        crate::log::logln!("[Reaper] Dropping thread with ID = {idx}.");
+        crate::log::logln!("[Reaper] Reclaiming resources from exited thread with ID = {idx}.");
         let _ = thread_table.remove(idx);
     }
 }
