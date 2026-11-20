@@ -27,3 +27,29 @@ struct DeviceEntryFixed4 {
     device_id: u8,
     dte_setting: DteSetting,
 }
+
+#[repr(C)]
+struct DeviceEntryFixed8 {
+    entry_type: EntryType,
+    device_id: u8,
+    dte_setting: DteSetting,
+    extended_bytes: [u8; 4],
+}
+
+#[repr(u8)]
+enum UidFormat {
+    NotPresent = 0,
+    Integer = 1,
+    String = 2,
+}
+
+#[repr(C)]
+struct DeviceEntryVariable {
+    entry_type: EntryType,
+    device_id: u16,
+    dte_setting: DteSetting,
+    hid: u32,
+    cid: u32,
+    uid_fmt: UidFormat,
+    uid_len: u8,
+}
