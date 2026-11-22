@@ -20,37 +20,38 @@ pub enum Error {
 struct IvInfo(u32);
 
 impl IvInfo {
-    fn extended_feature_support(&self) -> bool {
+    fn extended_feature_support(self) -> bool {
         self.0 & 1 != 0
     }
 
-    fn preboot_dma_remapping_used(&self) -> bool {
+    fn preboot_dma_remapping_used(self) -> bool {
         (self.0 >> 1) & 1 != 0
     }
 
-    fn guest_virtual_address_width(&self) -> u8 {
+    fn guest_virtual_address_width(self) -> u8 {
         const GVA_SIZE_SHIFT: u8 = 5;
         const GVA_SIZE_MASK: u32 = 0b111;
         bitwise::read_subfield(self.0, GVA_SIZE_SHIFT, GVA_SIZE_MASK) as u8
     }
 
-    fn system_physical_address_width(&self) -> u8 {
+    fn system_physical_address_width(self) -> u8 {
         const PA_SIZE_SHIFT: u8 = 8;
         const PA_SIZE_MASK: u32 = (1 << 7) - 1;
         bitwise::read_subfield(self.0, PA_SIZE_SHIFT, PA_SIZE_MASK) as u8
     }
 
-    fn system_virtual_address_width(&self) -> u8 {
+    fn system_virtual_address_width(self) -> u8 {
         const VA_SIZE_SHIFT: u8 = 15;
         const VA_SIZE_MASK: u32 = (1 << 7) - 1;
         bitwise::read_subfield(self.0, VA_SIZE_SHIFT, VA_SIZE_MASK) as u8
     }
 
-    fn is_ats_response_address_translation_range_reserved(&self) -> bool {
+    fn is_ats_response_address_translation_range_reserved(self) -> bool {
         (self.0 >> 22) & 1 != 0
     }
 }
 
+#[repr(C, packed)]
 pub struct IvrsHeader {
     signature: [u8; 4],
     length: u32,
@@ -65,7 +66,10 @@ pub struct IvrsHeader {
     _reserved: u64,
 }
 
+const _: () = assert!(size_of::<IvrsHeader>() == 48);
+
 #[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum EntryType {
     // 4-byte entries
     Reserved = 0,
@@ -76,6 +80,10 @@ pub(super) enum EntryType {
     // IVHDs
     IvhdLegacy = 16,
     IvhdModern = 17,
+    // IVMDs
+    IvmdAll = 32,
+    IvmdSelect = 33,
+    IvmdRange = 34,
     IvhdModernVariable = 64,
     // 8-byte entries
     Reserved2 = 65,
@@ -88,4 +96,34 @@ pub(super) enum EntryType {
     SpecialDevice = 72,
     // variable length entry
     AcpiHid = 240,
+}
+
+impl TryFrom<u8> for EntryType {
+    type Error = Error;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        Ok(match value {
+            0 => Self::Reserved,
+            1 => Self::AllDevicesUnderIommu,
+            2 => Self::Select,
+            3 => Self::StartOfRange,
+            4 => Self::EndOfRange,
+            16 => Self::IvhdLegacy,
+            17 => Self::IvhdModern,
+            32 => Self::IvmdAll,
+            33 => Self::IvmdSelect,
+            34 => Self::IvmdRange,
+            64 => Self::IvhdModernVariable,
+            65 => Self::Reserved2,
+            66 => Self::AliasSelect,
+            67 => Self::AliasStartOfRange,
+            68 => Self::Reserved4,
+            69 => Self::Reserved5,
+            70 => Self::ExtendedSelect,
+            71 => Self::ExtendedStartOfRange,
+            72 => Self::SpecialDevice,
+            240 => Self::AcpiHid,
+            _ => return Err(Error::InvalidIvdbType),
+        })
+    }
 }
