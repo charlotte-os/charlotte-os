@@ -8,6 +8,7 @@ mod device_entry;
 mod ivhd;
 mod ivmd;
 
+use crate::device_management::drivers::busses::pci_express::topology::PcieLocation;
 use crate::klib::bitwise;
 
 pub enum Error {
