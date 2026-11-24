@@ -1,2 +1,2 @@
 pub mod iommu;
-pub mod wired_interrupt_controller;
+pub mod wired_int_ctlr;

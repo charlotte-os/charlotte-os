@@ -33,7 +33,7 @@ pub trait LocalIntCtlrIfce {
     fn signal_eoi();
 }
 
-pub trait ExternalInterruptControllerIfce {
+pub trait ExtIntCtlrIfce {
     type EicPinNum;
     type Error;
 

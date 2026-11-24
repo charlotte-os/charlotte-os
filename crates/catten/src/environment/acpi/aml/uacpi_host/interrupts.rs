@@ -17,10 +17,10 @@ mod platform {
     use super::super::c_alloc::{allocate_object, free_object};
     use super::*;
     use crate::cpu::isa::constants::interrupt_vectors::{DYN_VEC_START_OFFSET, DYN_VECS_PER_LP};
-    use crate::cpu::isa::interface::interrupts::{DynIhMapIfce, ExternalInterruptControllerIfce};
+    use crate::cpu::isa::interface::interrupts::{DynIhMapIfce, ExtIntCtlrIfce};
     use crate::cpu::isa::interrupts::dynamic::DYN_IH_MAP;
     use crate::cpu::multiprocessor::spin::mutex::Mutex;
-    use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::{
+    use crate::device_management::drivers::platform_devices::wired_int_ctlr::ioapic::{
         IOAPIC_LIST,
         IoapicId,
     };

@@ -5,7 +5,7 @@ use core::ptr::NonNull;
 use hashbrown::HashMap;
 use spin::LazyLock;
 
-use crate::cpu::isa::interface::interrupts::ExternalInterruptControllerIfce;
+use crate::cpu::isa::interface::interrupts::ExtIntCtlrIfce;
 use crate::cpu::isa::interface::memory::address::VirtualAddressIfce;
 use crate::cpu::isa::interrupts::LocalIntCtlr;
 use crate::cpu::isa::lp::{IntSrcDscr, LpId};
@@ -15,20 +15,20 @@ use crate::environment::acpi::sdt::madt::interface::enumerate_ioapics;
 use crate::klib::bitwise::read_subfield;
 use crate::memory::VirtualAddress;
 
-pub static IOAPIC_LIST: LazyLock<RwLock<HashMap<IoapicId, Mutex<IoapicDescriptor>>>> =
+pub static IOAPIC_LIST: LazyLock<RwLock<HashMap<IoapicId, Mutex<Ioapic>>>> =
     LazyLock::new(|| RwLock::new(unsafe { enumerate_ioapics() }));
 
 pub type IoapicId = u8;
 
 #[derive(Debug)]
-pub struct IoapicDescriptor {
+pub struct Ioapic {
     base: VirtualAddress,
     version: u8,
     acpi_gsi_base: u32,
     num_redirection_entries: u16,
 }
 
-impl IoapicDescriptor {
+impl Ioapic {
     const IRT_BASE_OFFSET: u32 = 0x10;
 
     /// Create a new IOAPIC descriptor from the given base address.
@@ -131,7 +131,7 @@ impl IoapicDescriptor {
     }
 }
 
-impl ExternalInterruptControllerIfce for IoapicDescriptor {
+impl ExtIntCtlrIfce for Ioapic {
     type EicPinNum = u8;
     type Error = super::Error;
 

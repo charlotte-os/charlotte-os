@@ -6,8 +6,8 @@ use hashbrown::HashMap;
 use crate::cpu::isa::interface::memory::address::Address;
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
 #[cfg(target_arch = "x86_64")]
-use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::{
-    IoapicDescriptor,
+use crate::device_management::drivers::platform_devices::wired_int_ctlr::ioapic::{
+    Ioapic,
     IoapicId,
 };
 use crate::device_management::interrupt_routing::legacy_irqs::LEGACY_IRQ_COUNT;
@@ -100,7 +100,7 @@ pub fn resolve_acpi_interrupt(irq: u32) -> Option<(u32, bool, bool)> {
     Some(route)
 }
 
-pub unsafe fn enumerate_ioapics() -> HashMap<IoapicId, Mutex<IoapicDescriptor>> {
+pub unsafe fn enumerate_ioapics() -> HashMap<IoapicId, Mutex<Ioapic>> {
     logln!("[ACPI] Enumerating IOAPICs via the ACPI MADT.");
 
     let ioapic_madt_entries = unsafe {
@@ -152,9 +152,8 @@ pub unsafe fn enumerate_ioapics() -> HashMap<IoapicId, Mutex<IoapicDescriptor>> 
             );
             vaddr + (unsafe { e.read_unaligned() }.ioapic_address as usize & 0xfff)
         };
-        let ioapic_desc = unsafe {
-            IoapicDescriptor::new(vaddr, e.read_unaligned().global_system_interrupt_base)
-        };
+        let ioapic_desc =
+            unsafe { Ioapic::new(vaddr, e.read_unaligned().global_system_interrupt_base) };
         logln!(
             "[ACPI] Enumerated IOAPIC with ID = {:?}: {:?}",
             (unsafe { e.read_unaligned() }.ioapic_id),

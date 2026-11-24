@@ -45,7 +45,7 @@ extern "C" fn initialize_platform() {
 #[cfg(target_arch = "x86_64")]
 #[unsafe(no_mangle)]
 pub extern "C" fn print_ioapic_info() {
-    use crate::device_management::drivers::platform_devices::wired_interrupt_controller::ioapic::IOAPIC_LIST;
+    use crate::device_management::drivers::platform_devices::wired_int_ctlr::ioapic::IOAPIC_LIST;
 
     logln!("LP {}: Printing IOAPIC information...", (get_lp_id()));
     let ioapic_list = IOAPIC_LIST.read();
