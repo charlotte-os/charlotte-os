@@ -3,7 +3,7 @@ use core::sync::atomic::{AtomicBool, AtomicU16, AtomicU32};
 use crate::cpu::isa::lp::LpId;
 use crate::timers::TimerQueue;
 
-pub struct PerLpData {
+pub struct LogicalProcessorData {
     pub id: LpId,
     pub interrupt_depth: AtomicU16,
     pub interrupt_save_count: AtomicU32,
