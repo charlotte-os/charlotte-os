@@ -11,7 +11,7 @@ test = false
 bench = false
 
 [features]
-default = ["acpi", "display"]
+default = ["acpi", "display", "pci_ids_full"]
 
 acpi = ["dep:uacpi-wrapper"]
 # Exercises host services in thread context and installs a QEMU power-button SCI probe.
