@@ -10,7 +10,7 @@ use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use uacpi_wrapper::*;
 
 use super::c_alloc::{allocate_object, free_object};
-use crate::cpu::multiprocessor::interrupt_tracking::get_interrupt_depth;
+// use crate::cpu::multiprocessor::interrupt_tracking::get_interrupt_depth;
 use crate::cpu::multiprocessor::spin::mutex::Mutex;
 use crate::cpu::scheduler::sync::semaphore::Semaphore;
 use crate::cpu::scheduler::{spawn_thread_on_lp, yield_lp};

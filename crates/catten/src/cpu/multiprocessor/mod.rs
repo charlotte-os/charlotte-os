@@ -1,6 +1,6 @@
 //! # Multi-Processor Management
 pub mod cpu_topology;
-pub mod interrupt_tracking;
+mod int_state;
 pub mod ipi;
 pub mod per_lp;
 pub mod spin;
